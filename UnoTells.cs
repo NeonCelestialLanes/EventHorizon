@@ -74,6 +74,14 @@ internal sealed class UnoTells : IDisposable
 
     private void Apply(string name, string? world, string message)
     {
+        var collected = CollectTell.Hear(this.app, name, world, message);
+        if (collected is not null)
+        {
+            this.app.Note(collected);
+            this.Show(collected);
+            return;
+        }
+
         var label = UnoTournament.Label(name, world);
         var desk = TellSignup.Find(this.app.Store, message, registrationOpen: true);
         if (desk is null)

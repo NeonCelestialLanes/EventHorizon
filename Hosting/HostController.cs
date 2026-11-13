@@ -61,8 +61,14 @@ internal static class ScheduleOrder
         return best;
     }
 
+    public static List<ScheduleActivity> Spoken(EventDocument ev) =>
+        Sort(ev).Where(activity => !ScriptSpeech.IsFollowOn(ev.Scripts, activity.ScriptId)).ToList();
+
     public static int CompletedCount(EventDocument ev, LiveEventState state) =>
         ev.Schedule.Count(activity => StatusOf(activity, state) is ActivityProgressStatus.Completed or ActivityProgressStatus.Skipped);
+
+    public static int SpokenCompleted(EventDocument ev, LiveEventState state) =>
+        Spoken(ev).Count(activity => StatusOf(activity, state) is ActivityProgressStatus.Completed or ActivityProgressStatus.Skipped);
 
     public static ScheduleActivity? DueCue(EventDocument ev, LiveEventState state, DateTimeOffset now)
     {
@@ -233,6 +239,16 @@ internal static class HostController
         };
         progress.Players.Add(player);
         return player;
+    }
+
+    public static void SeatWinner(GameProgress progress)
+    {
+        var named = progress.Players.Where(player => !string.IsNullOrWhiteSpace(player.Name)).ToList();
+        var standing = named.Where(player => !player.Eliminated).Select(player => player.Name.Trim()).ToList();
+        progress.Winners.Clear();
+        if (named.Count >= 2 && standing.Count == 1)
+            progress.Winners.Add(standing[0]);
+        progress.Players = progress.Players.OrderBy(player => player.Eliminated).ToList();
     }
 
     public static string? BuildBracket(GameInstance game, GameProgress progress)

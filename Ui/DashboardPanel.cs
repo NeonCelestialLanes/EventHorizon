@@ -69,9 +69,9 @@ internal static class DashboardPanel
         ImGui.SameLine();
         Chrome.Badge(state.Hosting ? "Hosting" : Labels.Spaced(ev.Status.ToString()), state.Hosting ? ThemeHolder.Pink : ThemeService.Status(app.Theme.Current, ev.Status));
         Chrome.Muted(EventClock.FormatDate(ev.Date) + "  ·  " + EventClock.FormatClock(ev.Date, ev.StartTime, ev.Timezone) + "  ·  " + Labels.Location(ev));
-        var done = ScheduleOrder.CompletedCount(ev, state);
-        var total = Math.Max(1, ev.Schedule.Count);
-        ImGui.ProgressBar(ev.Schedule.Count == 0 ? 0f : done / (float)ev.Schedule.Count, new Vector2(-1, 14), done + " / " + ev.Schedule.Count + " activities");
+        var done = ScheduleOrder.SpokenCompleted(ev, state);
+        var total = ScheduleOrder.Spoken(ev).Count;
+        ImGui.ProgressBar(total == 0 ? 0f : done / (float)total, new Vector2(-1, 14), done + " / " + total + " activities");
         ImGui.TextDisabled("Now");
         ImGui.SameLine();
         ImGui.TextUnformatted(current?.Title ?? "Not started");
@@ -130,7 +130,7 @@ internal static class DashboardPanel
 
         ImGui.TextUnformatted(time);
         Chrome.Muted(Labels.Location(ev));
-        ImGui.TextDisabled(EventClock.EventCountdown(ev, DateTimeOffset.Now) + "  ·  " + ev.Schedule.Count + " activities");
+        ImGui.TextDisabled(EventClock.EventCountdown(ev, DateTimeOffset.Now) + "  ·  " + ScheduleOrder.Spoken(ev).Count + " activities");
         if (Chrome.Accent("Open"))
             app.Select(ev.EventId);
         ImGui.SameLine();

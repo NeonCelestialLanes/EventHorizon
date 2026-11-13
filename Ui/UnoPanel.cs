@@ -13,7 +13,7 @@ internal static class UnoPanel
         var board = game.Tournament;
         board.Normalize();
         Chrome.Section("Uno tournament");
-        Chrome.Muted("Players register by sending you a tell that says " + TellSignup.Word(game) + ". Nothing is sent back, and the prize is not handed out from here.");
+        Chrome.Muted("Players register by sending you a tell that says " + TellSignup.Word(game) + ". Capitalization does not matter. Nothing is sent back, and the prize is not handed out from here.");
 
         if (progress.Winners.Count == 1 && !string.IsNullOrWhiteSpace(progress.Winners[0]))
             Champion(app, ev, game, progress.Winners[0]);
@@ -48,7 +48,7 @@ internal static class UnoPanel
         if (!progress.RegistrationOpen && Chrome.Accent("Open registration"))
         {
             Edit(app, ev, game, edit => edit.RegistrationOpen = true);
-            app.Note("Registration is open. A tell that says " + TellSignup.Word(game) + " will add that character.");
+            app.Note("Registration is open. A tell that says " + TellSignup.Word(game) + " will add that character. Capitalization does not matter.");
         }
         else if (progress.RegistrationOpen && Chrome.Button("Close registration"))
         {

@@ -121,6 +121,8 @@ internal static class ContestPanel
             if (Chrome.Field("Type", contest.ContestType, value => contest.ContestType = value))
                 app.Store.MarkEvent(ev.EventId);
             ImGui.TextDisabled("Screenshot, GPose, Collection, Scavenger, Raffle, Creative, or anything else.");
+            if ((contest.ContestType ?? "").Contains("collect", StringComparison.OrdinalIgnoreCase))
+                Chrome.Muted("A tell with every clue word counts. Capitalization and word order do not matter. Nothing is sent back.");
             if (Chrome.Area("Rules", contest.Rules, value => contest.Rules = value, 60))
                 app.Store.MarkEvent(ev.EventId);
             if (Chrome.Field("Starts", contest.StartTime, value => contest.StartTime = value))

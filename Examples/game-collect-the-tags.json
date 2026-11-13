@@ -5,7 +5,7 @@
   "description": "A list of hidden words. Each one stays hidden until the host reveals it.",
   "category": "Collection",
   "formats": ["Collection"],
-  "rules": "Reveal words yourself on the schedule you chose. Pick the winner by hand when someone has the full set. Scheduled times are reminders, not automatic reveals.",
+  "rules": "Reveal words yourself on the schedule you chose. A tell with every word counts. Capitalization and word order do not matter. Scheduled times are reminders, not automatic reveals.",
   "scoringMethod": "Manual winner",
   "participationMethod": "Open",
   "rounds": [

@@ -9,7 +9,7 @@ internal static class TellWordBox
 
         var shown = (word ?? "").Trim();
         Chrome.Muted(shown.Length == 0
-            ? "The exact word a player /tells you to register. Leave this blank on Uno to keep uno."
-            : "Players register with a tell that says " + shown + ".");
+            ? "The word a player /tells you to register. Capitalization does not matter. Leave this blank on Uno to keep uno."
+            : "Players register with a tell that says " + shown + ". Capitalization does not matter.");
     }
 }

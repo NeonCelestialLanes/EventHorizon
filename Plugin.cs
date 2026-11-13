@@ -24,6 +24,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly MainWindow main;
     private readonly LiveHostWindow host;
     private readonly CompactHostWindow compact;
+    private readonly GameWindow game;
 
     public Plugin(IDalamudPluginInterface pluginInterface, ICommandManager commandManager, IChatGui chat, IPluginLog log, ITextureProvider textures, IToastGui toast, IObjectTable players)
     {
@@ -42,9 +43,11 @@ public sealed class Plugin : IDalamudPlugin
         this.main = new MainWindow(this.app, LoadLogo(directory, textures));
         this.host = new LiveHostWindow(this.app);
         this.compact = new CompactHostWindow(this.app);
+        this.game = new GameWindow(this.app);
         this.windows.AddWindow(this.main);
         this.windows.AddWindow(this.host);
         this.windows.AddWindow(this.compact);
+        this.windows.AddWindow(this.game);
 
         this.AddCommand(CommandName, "Open or close Event Horizon.");
         this.AddCommand(Alias, "Open Event Horizon. /eh host, next, reload, games, schedule.");
@@ -186,6 +189,13 @@ public sealed class Plugin : IDalamudPlugin
             this.app.Session.RequestCompact = false;
             this.compact.IsOpen = true;
             this.compact.BringToFront();
+        }
+
+        if (this.app.Session.RequestGame)
+        {
+            this.app.Session.RequestGame = false;
+            this.game.IsOpen = true;
+            this.game.BringToFront();
         }
     }
 }

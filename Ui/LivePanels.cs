@@ -27,6 +27,9 @@ internal static class GameBoard
             return;
         }
 
+        if (!UnoTournament.IsUno(game) && UsesRoster(game))
+            Registration(app, ev, game, progress);
+
         var round = HostController.CurrentRound(game, progress);
         if (round is not null)
         {
@@ -56,12 +59,12 @@ internal static class GameBoard
 
         if (game.Formats.Contains(GameFormat.Collection))
             Collection(app, ev, game, progress);
-        if (game.Formats.Count == 0 || game.Formats.Contains(GameFormat.Points) || game.Formats.Contains(GameFormat.Elimination) || game.Formats.Contains(GameFormat.Custom) || game.Formats.Contains(GameFormat.Tournament) || game.Formats.Contains(GameFormat.QuestionAnswer))
+        if (UsesRoster(game))
             Players(app, ev, game, progress);
         if (game.Formats.Contains(GameFormat.Tournament))
             Bracket(app, ev, game, progress);
 
-        if (progress.Winners.Count > 0)
+        if (KeepsScore(game) && progress.Winners.Count > 0)
             ImGui.TextColored(ThemeHolder.Gold, "Winner: " + string.Join(", ", progress.Winners));
     }
 
@@ -79,6 +82,10 @@ internal static class GameBoard
                 TriviaPanel.Clock(app, ev, game, question.Id, Math.Max(1f, app.Store.Config.UiScale));
                 if (!string.IsNullOrWhiteSpace(question.Prompt))
                     ImGui.TextWrapped(question.Prompt);
+                ChatCopy.Button(app, "trivia-question-" + game.InstanceId + "-" + question.Id, TriviaScore.QuestionYell(game, progress, question), "Copy question", "This question is empty.");
+                ImGui.SameLine();
+                if (Chrome.Button("Announce the point##compact-" + question.Id))
+                    TriviaPanel.AnnouncePoint(app, game, progress, question);
                 var answerHidden = !string.IsNullOrWhiteSpace(question.Answer) && !HostController.IsRevealed(progress, question.Id);
                 if (answerHidden && Chrome.Accent("Reveal"))
                     Mutate(app, ev, game, edit => HostController.Reveal(edit, question.Id));
@@ -205,6 +212,9 @@ internal static class GameBoard
     private static void Collection(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress)
     {
         Chrome.Section("Hidden items");
+        Chrome.Muted("A tell with every word counts. Capitalization and word order do not matter. Nothing is sent back.");
+        if (progress.Winners.Count > 0)
+            ImGui.TextColored(ThemeHolder.Gold, "Winner: " + string.Join(", ", progress.Winners));
         foreach (var round in game.Rounds)
         {
             var revealed = HostController.IsRevealed(progress, round.RoundId);
@@ -223,9 +233,50 @@ internal static class GameBoard
         }
     }
 
+    private static bool UsesRoster(GameInstance game) =>
+        game.Formats.Count == 0
+        || game.Formats.Contains(GameFormat.MultipleChoice)
+        || game.Formats.Contains(GameFormat.Voting)
+        || game.Formats.Contains(GameFormat.Points)
+        || game.Formats.Contains(GameFormat.Elimination)
+        || game.Formats.Contains(GameFormat.Custom)
+        || game.Formats.Contains(GameFormat.Tournament)
+        || game.Formats.Contains(GameFormat.QuestionAnswer);
+
+    private static void Registration(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress)
+    {
+        TellWordBox.Draw(game.TellWord, value => game.TellWord = value, () => app.Store.MarkEvent(ev.EventId));
+        var word = TellSignup.Word(game);
+        Chrome.Badge(progress.RegistrationOpen ? "Registration open" : "Registration closed", progress.RegistrationOpen ? ThemeHolder.Mint : ThemeHolder.Gold);
+        ImGui.SameLine();
+        if (!progress.RegistrationOpen && Chrome.Accent("Open registration"))
+        {
+            if (word.Length == 0)
+                app.Fail("Enter a tell word first.");
+            else
+            {
+                Mutate(app, ev, game, edit => edit.RegistrationOpen = true);
+                app.Note("Registration is open. A tell that says " + word + " will add that character. Capitalization does not matter.");
+            }
+        }
+        else if (progress.RegistrationOpen && Chrome.Button("Close registration"))
+        {
+            Mutate(app, ev, game, edit => edit.RegistrationOpen = false);
+            app.Note("Registration is closed.");
+        }
+    }
+
+    private static bool KeepsScore(GameInstance game) =>
+        game.Formats.Contains(GameFormat.Points)
+        || game.Formats.Contains(GameFormat.QuestionAnswer)
+        || (game.ScoringMethod ?? "").Contains("point", StringComparison.OrdinalIgnoreCase);
+
     private static void Players(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress)
     {
+        var scored = KeepsScore(game);
         Chrome.Section("Players");
+        if (!scored)
+            Chrome.Muted("Check Eliminated when they sit down. The last player still in is the winner.");
         var playerName = app.Session.PlayerName;
         ImGui.TextDisabled("Player name");
         ImGui.SameLine();
@@ -236,12 +287,29 @@ internal static class GameBoard
         if (Chrome.Button("Add player") && !string.IsNullOrWhiteSpace(app.Session.PlayerName))
         {
             var name = app.Session.PlayerName;
-            Mutate(app, ev, game, edit => HostController.AddPlayer(edit, name));
+            Mutate(app, ev, game, edit =>
+            {
+                HostController.AddPlayer(edit, name);
+                if (!scored)
+                    HostController.SeatWinner(edit);
+            });
             app.Session.PlayerName = "";
         }
 
+        if (!scored)
+        {
+            var standing = progress.Players.Where(player => !player.Eliminated && !string.IsNullOrWhiteSpace(player.Name)).Select(player => player.Name.Trim()).ToList();
+            if (progress.Winners.Count == 1)
+                ImGui.TextColored(ThemeHolder.Gold, "Winner: " + progress.Winners[0]);
+            else if (standing.Count > 1)
+                ImGui.TextUnformatted("Still in: " + string.Join(", ", standing));
+            else if (progress.Players.Any(player => !string.IsNullOrWhiteSpace(player.Name)))
+                Chrome.Muted("Everyone is sitting down.");
+        }
+
         string? remove = null;
-        foreach (var player in progress.Players)
+        var roster = scored ? progress.Players : progress.Players.OrderBy(player => player.Eliminated).ToList();
+        foreach (var player in roster)
         {
             ImGui.PushID(player.PlayerId);
             var name = player.Name;
@@ -249,26 +317,51 @@ internal static class GameBoard
             ImGui.SameLine();
             ImGui.SetNextItemWidth(160);
             if (ImGui.InputText("##pname", ref name, 80))
-                Mutate(app, ev, game, edit => edit.Players.First(item => item.PlayerId == player.PlayerId).Name = name);
-            ImGui.SameLine();
-            ImGui.TextDisabled("Score");
-            ImGui.SameLine();
-            var score = player.Score;
-            ImGui.SetNextItemWidth(80);
-            if (ImGui.InputInt("##score", ref score))
-                Mutate(app, ev, game, edit => edit.Players.First(item => item.PlayerId == player.PlayerId).Score = score);
-            ImGui.SameLine();
-            var eliminated = player.Eliminated;
-            if (ImGui.Checkbox("Out", ref eliminated))
-                Mutate(app, ev, game, edit => edit.Players.First(item => item.PlayerId == player.PlayerId).Eliminated = eliminated);
-            ImGui.SameLine();
-            if (Chrome.Button("Winner"))
             {
+                var written = name;
                 Mutate(app, ev, game, edit =>
                 {
-                    if (!edit.Winners.Contains(player.Name))
-                        edit.Winners.Add(player.Name);
+                    edit.Players.First(item => item.PlayerId == player.PlayerId).Name = written;
+                    if (!scored)
+                        HostController.SeatWinner(edit);
                 });
+            }
+
+            ImGui.SameLine();
+            if (scored)
+            {
+                ImGui.TextDisabled("Score");
+                ImGui.SameLine();
+                var score = player.Score;
+                ImGui.SetNextItemWidth(80);
+                if (ImGui.InputInt("##score", ref score))
+                    Mutate(app, ev, game, edit => edit.Players.First(item => item.PlayerId == player.PlayerId).Score = score);
+                ImGui.SameLine();
+                var eliminated = player.Eliminated;
+                if (ImGui.Checkbox("Out", ref eliminated))
+                    Mutate(app, ev, game, edit => edit.Players.First(item => item.PlayerId == player.PlayerId).Eliminated = eliminated);
+                ImGui.SameLine();
+                if (Chrome.Button("Winner"))
+                {
+                    Mutate(app, ev, game, edit =>
+                    {
+                        if (!edit.Winners.Contains(player.Name))
+                            edit.Winners.Add(player.Name);
+                    });
+                }
+            }
+            else
+            {
+                var eliminated = player.Eliminated;
+                if (ImGui.Checkbox("Eliminated", ref eliminated))
+                {
+                    var sitting = eliminated;
+                    Mutate(app, ev, game, edit =>
+                    {
+                        edit.Players.First(item => item.PlayerId == player.PlayerId).Eliminated = sitting;
+                        HostController.SeatWinner(edit);
+                    });
+                }
             }
 
             ImGui.SameLine();
@@ -278,7 +371,12 @@ internal static class GameBoard
         }
 
         if (remove is not null)
-            Mutate(app, ev, game, edit => edit.Players.RemoveAll(player => player.PlayerId == remove));
+            Mutate(app, ev, game, edit =>
+            {
+                edit.Players.RemoveAll(player => player.PlayerId == remove);
+                if (!scored)
+                    HostController.SeatWinner(edit);
+            });
     }
 
     private static void Bracket(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress)
@@ -516,8 +614,9 @@ internal static class LiveHostPanel
         ImGui.SameLine();
         EventActions.ResetButton(app, ev);
 
-        var done = ScheduleOrder.CompletedCount(ev, state);
-        ImGui.ProgressBar(ev.Schedule.Count == 0 ? 0f : done / (float)Math.Max(1, ev.Schedule.Count), new Vector2(-1, 16), done + " / " + ev.Schedule.Count);
+        var done = ScheduleOrder.SpokenCompleted(ev, state);
+        var slots = ScheduleOrder.Spoken(ev).Count;
+        ImGui.ProgressBar(slots == 0 ? 0f : done / (float)slots, new Vector2(-1, 16), done + " / " + slots);
         var suggested = ScheduleOrder.Suggested(ev, state, now);
         if (suggested is not null && suggested.ActivityId != state.CurrentActivityId)
             Chrome.Muted("Clock suggestion: " + suggested.Title + ". The schedule will not advance by itself.");
@@ -568,10 +667,7 @@ internal static class LiveHostPanel
 
         ImGui.SameLine();
         if (current?.GameInstanceId is not null && Chrome.Button("Open game"))
-        {
-            state.OpenGameInstanceId = current.GameInstanceId;
-            app.Store.MarkState(ev.EventId);
-        }
+            OpenGameWindow(app, ev, state, current.GameInstanceId);
 
         ImGui.SameLine();
         if (dj is not null && Chrome.Button("Copy DJ intro"))
@@ -582,17 +678,13 @@ internal static class LiveHostPanel
                 app.Note(dj.Name + " has no introduction text yet. Add it on the DJ tab.");
         }
 
-        var open = OpenGame(ev, state, current);
-        if (open is not null)
-            GameBoard.Draw(app, ev, open);
-        else if (ev.Games.Count > 0 && ImGui.BeginCombo("Open a game", "Choose"))
+        if (ev.Games.Count > 0 && ImGui.BeginCombo("Open a game", "Choose"))
         {
             foreach (var game in ev.Games)
             {
                 if (!ImGui.Selectable(game.Name))
                     continue;
-                state.OpenGameInstanceId = game.InstanceId;
-                app.Store.MarkState(ev.EventId);
+                OpenGameWindow(app, ev, state, game.InstanceId);
             }
 
             ImGui.EndCombo();
@@ -645,6 +737,20 @@ internal static class LiveHostPanel
 
         return ev.Games.FirstOrDefault(game => game.InstanceId == state.OpenGameInstanceId);
     }
+
+    private static void OpenGameWindow(HorizonApp app, EventDocument ev, LiveEventState state, string? instanceId)
+    {
+        var game = ev.Games.FirstOrDefault(item => item.InstanceId == instanceId);
+        if (game is null)
+        {
+            app.Fail("This activity has no game to open.");
+            return;
+        }
+
+        state.OpenGameInstanceId = game.InstanceId;
+        app.Store.MarkState(ev.EventId);
+        app.Session.RequestGame = true;
+    }
 }
 
 internal sealed class LiveHostWindow : Dalamud.Interface.Windowing.Window
@@ -668,6 +774,51 @@ internal sealed class LiveHostWindow : Dalamud.Interface.Windowing.Window
     {
         ImGui.SetWindowFontScale(this.app.Store.Config.UiScale);
         LiveHostPanel.Draw(this.app, poppedOut: true);
+        ImGui.SetWindowFontScale(1f);
+    }
+}
+
+internal sealed class GameWindow : Dalamud.Interface.Windowing.Window
+{
+    private readonly HorizonApp app;
+
+    public GameWindow(HorizonApp app)
+        : base("Event Horizon Game")
+    {
+        this.app = app;
+        this.Size = new Vector2(760, 680);
+        this.SizeCondition = ImGuiCond.FirstUseEver;
+        this.SizeConstraints = new Dalamud.Interface.Windowing.WindowSizeConstraints
+        {
+            MinimumSize = new Vector2(420, 320),
+            MaximumSize = new Vector2(1800, 1400),
+        };
+    }
+
+    public override void Draw()
+    {
+        ImGui.SetWindowFontScale(this.app.Store.Config.UiScale);
+        var ev = this.app.Store.SelectedEvent();
+        if (ev is null)
+        {
+            Chrome.Muted("Select an event first.");
+            ImGui.SetWindowFontScale(1f);
+            return;
+        }
+
+        var state = this.app.Store.StateFor(ev.EventId);
+        var game = string.IsNullOrWhiteSpace(state.OpenGameInstanceId)
+            ? null
+            : ev.Games.FirstOrDefault(item => item.InstanceId == state.OpenGameInstanceId);
+        if (game is null)
+        {
+            Chrome.Muted("Choose a game from Live Host.");
+            ImGui.SetWindowFontScale(1f);
+            return;
+        }
+
+        this.WindowName = game.Name;
+        GameBoard.Draw(this.app, ev, game);
         ImGui.SetWindowFontScale(1f);
     }
 }

@@ -86,6 +86,26 @@ Check("uno registration", () =>
     Require(TellSignup.Word(unoWord) == "uno", "blank uno word");
     unoWord.TellWord = "cards";
     Require(TellSignup.Matches(unoWord, "cards") && !TellSignup.Matches(unoWord, "uno"), "replaced uno word");
+    var sendWord = new GameInstance { Name = "Send or Delete", Formats = [GameFormat.MultipleChoice, GameFormat.Points], TellWord = "send" };
+    Require(TellSignup.Word(sendWord) == "send" && TellSignup.Matches(sendWord, " SEND ") && TellSignup.Matches(sendWord, "SeNd") && !TellSignup.Matches(sendWord, "delete"), "send tell");
+    var truthsWord = new GameInstance { Name = "Two Truths and a Chirp", Formats = [GameFormat.MultipleChoice], TellWord = "truths" };
+    Require(TellSignup.Word(truthsWord) == "truths" && TellSignup.Matches(truthsWord, "truths") && !TellSignup.Matches(truthsWord, "chirp"), "truths tell");
+    var tags = new[] { "Velvet", "Lantern", "Harbor" };
+    Require(CollectTell.SameWords(tags, "harbor VELVET lantern") && CollectTell.SameWords(tags, "velvet, lantern, harbor."), "collect tell");
+    Require(!CollectTell.SameWords(tags, "velvet lantern") && !CollectTell.SameWords(tags, "velvet lantern harbor extra"), "incomplete collect tell");
+    var seated = new GameProgress();
+    HostController.AddPlayer(seated, "Nova");
+    HostController.AddPlayer(seated, "Bea");
+    HostController.AddPlayer(seated, "Rio");
+    HostController.SeatWinner(seated);
+    Require(seated.Winners.Count == 0, "still playing");
+    seated.Players[0].Eliminated = true;
+    seated.Players[2].Eliminated = true;
+    HostController.SeatWinner(seated);
+    Require(seated.Winners.Count == 1 && seated.Winners[0] == "Bea" && seated.Players[0].Name == "Bea" && seated.Players[1].Eliminated && seated.Players[2].Eliminated, "winner on top");
+    seated.Players.Single(player => player.Name == "Bea").Eliminated = true;
+    HostController.SeatWinner(seated);
+    Require(seated.Winners.Count == 0, "everyone sitting");
     Require(UnoTournament.WorldAfter("Nova", "Nova Sephirot") == "Sephirot", "world");
 
     var progress = new GameProgress();
@@ -183,6 +203,9 @@ Check("trivia scores", () =>
     Require(TriviaScore.Award(progress, "q1", otherNova.PlayerId) is not null, "second answer gets no point");
     Require(TriviaScore.Award(progress, "q2", nova.PlayerId) is null, "another question");
     Require(TriviaScore.Points(progress.Trivia, nova.PlayerId) == 2, "two points");
+    var announced = TriviaScore.PointYell(game, progress, TriviaScore.Questions(game, progress.Trivia)[0]);
+    Require(announced.Count == 1 && announced[0] == "/yell Question 1 goes to Nova (Sephirot)! That's 2 points.", announced[0]);
+    Require(TriviaScore.PointYell(game, new GameProgress(), new TriviaQuestion("q1", "", "One", "A", false)).Count == 0, "no point yet");
     Require(TriviaScore.Skip(progress, "q3") is null, "skip");
     Require(TriviaScore.Points(progress.Trivia, nova.PlayerId) == 2, "skip adds nothing");
     Require(TriviaScore.Restore(progress, "q3") is null, "restore");
@@ -222,6 +245,18 @@ Check("trivia scores", () =>
     Require(state.Prizes["prz-trivia"].Status == AwardStatus.Pending, "prize pending");
     Require(progress.Winners[0] == "Nova (Sephirot)", progress.Winners[0]);
     var champion = TriviaScore.ChampionYell(progress.Winners[0], TriviaScore.Points(progress.Trivia, nova.PlayerId), TriviaScore.PrizeLabel(ev, game));
+    var asked = new GameInstance
+    {
+        Rounds = [new GameRound { RoundId = "q", Prompt = "What color is the accent?", Choices = ["Gold", "Mint"], CorrectAnswer = "classified" }],
+    };
+    var copied = TriviaScore.QuestionYell(asked, new GameProgress(), TriviaScore.Questions(asked, null)[0]);
+    Require(copied.Count == 1 && copied[0] == "/yell Question 1: What color is the accent? Gold / Mint", copied[0]);
+    Require(!copied[0].Contains("classified", StringComparison.Ordinal), "answer stays off the question");
+    var longPrompt = new string('a', 40) + " marigold";
+    var longGame = new GameInstance { Rounds = [new GameRound { RoundId = "long", Prompt = string.Join(". ", Enumerable.Repeat(longPrompt, 20)) }] };
+    var parts = TriviaScore.QuestionYell(longGame, new GameProgress(), TriviaScore.Questions(longGame, null)[0]);
+    Require(parts.Count > 1 && parts.All(line => line.StartsWith("/yell ", StringComparison.Ordinal) && line.Length <= TriviaScore.YellLimit), "long question splits");
+    Require(string.Join(" ", parts).Contains("marigold", StringComparison.Ordinal), "question words stay");
     Require(champion.StartsWith("/yell And we have our trivia champion!", StringComparison.Ordinal), champion);
     Require(champion.Contains("Nova (Sephirot)", StringComparison.Ordinal) && champion.Contains("1,250 Aether Coins", StringComparison.Ordinal), champion);
 
@@ -455,6 +490,7 @@ Check("full script", () =>
     ev.Scripts.Add(new ScriptDocument { ScriptId = "scr-dj", SpokenText = "Here is the DJ.", Announcement = "/yell Here is the DJ." });
     var state = new LiveEventState { CurrentActivityId = "act-open" };
     HostController.Advance(ev, state);
+    Require(ScheduleOrder.Spoken(ev).Count == 2 && ScheduleOrder.Spoken(ev)[0].ActivityId == "act-open", "the schedule keeps the speech, not each copied paragraph");
     Require(state.CurrentActivityId == "act-dj", "next activity leaves the whole speech");
     Require(ScheduleOrder.StatusOf(ev.Schedule.First(item => item.ActivityId == "act-open-8"), state) == ActivityProgressStatus.Completed, "continuation slots finish with the speech");
     var cursor = new SpeechCursor { Index = 2, Copied = [0, 1] };

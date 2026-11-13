@@ -257,7 +257,7 @@
       "contestId": "cst-tags",
       "title": "Collect the tags",
       "contestType": "Collection",
-      "rules": "Three words are hidden. They stay hidden until the host reveals each one. The first person to bring all three words to Rowan wins. There is no automatic check.",
+      "rules": "Three words are hidden. They stay hidden until the host reveals each one. A tell with every word counts. Capitalization and word order do not matter.",
       "startTime": "20:00",
       "deadline": "22:40",
       "prizeId": "prz-tags",

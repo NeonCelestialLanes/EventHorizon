@@ -383,6 +383,43 @@ internal static class TriviaScore
     public static string ChampionYell(string winner, int points, string prize) =>
         "/yell And we have our trivia champion! Congratulations to " + winner.Trim() + ", who finished with " + points + " " + PointWord(points) + "! You've won " + prize.Trim() + "! Everybody give our winner a round of applause!";
 
+    public static IReadOnlyList<string> QuestionYell(GameInstance game, GameProgress progress, TriviaQuestion question)
+    {
+        var prompt = (question.Prompt ?? "").Trim();
+        if (prompt.Length == 0)
+            prompt = (question.Title ?? "").Trim();
+        if (prompt.Length == 0)
+            return [];
+
+        var round = game.Rounds.FirstOrDefault(item => item.RoundId == question.Id);
+        var choices = (round?.Choices ?? []).Where(choice => !string.IsNullOrWhiteSpace(choice)).Select(choice => choice.Trim()).ToList();
+        if (choices.Count > 0)
+            prompt = prompt.TrimEnd() + " " + string.Join(" / ", choices);
+
+        var questions = Questions(game, progress.Trivia);
+        var index = questions.FindIndex(item => item.Id == question.Id);
+        var lead = question.Extra ? "Tiebreaker: " : index < 0 ? "" : "Question " + (index + 1) + ": ";
+        return ScriptSpeech.Fit("/yell " + lead + prompt);
+    }
+
+    public static IReadOnlyList<string> PointYell(GameInstance game, GameProgress progress, TriviaQuestion question)
+    {
+        var result = progress.Trivia?.Results.FirstOrDefault(item => item.QuestionId == question.Id);
+        if (result is not { Skipped: false, PlayerId: { } playerId })
+            return [];
+
+        var player = progress.Players.FirstOrDefault(item => item.PlayerId == playerId);
+        if (player is null || string.IsNullOrWhiteSpace(player.Name))
+            return [];
+
+        var label = UnoTournament.Label(player.Name, player.World);
+        var points = Points(progress.Trivia, playerId);
+        var questions = Questions(game, progress.Trivia);
+        var index = questions.FindIndex(item => item.Id == question.Id);
+        var which = question.Extra ? "The tiebreaker" : index < 0 ? "That question" : "Question " + (index + 1);
+        return ScriptSpeech.Fit("/yell " + which + " goes to " + label + "! That's " + points + " " + PointWord(points) + ".");
+    }
+
     public static IReadOnlyList<string> TopThree(IReadOnlyList<TriviaRow> rows, int done, int left)
     {
         var shown = rows.Where(row => row.Rank <= 3).ToList();

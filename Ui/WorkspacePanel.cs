@@ -219,7 +219,7 @@ internal static class SchedulePanel
             app.Store.MarkEvent(ev.EventId);
         }
 
-        var ordered = ScheduleOrder.Sort(ev);
+        var ordered = ScheduleOrder.Spoken(ev);
         for (var index = 0; index < ordered.Count; index++)
             Row(app, ev, state, ordered, index, now);
     }
@@ -331,7 +331,7 @@ internal static class SchedulePanel
 
     private static void Swap(HorizonApp app, EventDocument ev, ScheduleActivity activity, int direction)
     {
-        var ordered = ScheduleOrder.Sort(ev);
+        var ordered = ScheduleOrder.Spoken(ev);
         var index = ordered.FindIndex(item => item.ActivityId == activity.ActivityId);
         var other = ordered[index + direction];
         (activity.StartTime, other.StartTime) = (other.StartTime, activity.StartTime);

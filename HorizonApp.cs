@@ -85,6 +85,8 @@ internal sealed class UiSession
 
     public bool RequestCompact { get; set; }
 
+    public bool RequestGame { get; set; }
+
     public string? LibraryGameId { get; set; }
 
     public string? LibraryScriptId { get; set; }

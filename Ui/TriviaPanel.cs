@@ -39,6 +39,7 @@ internal static class TriviaPanel
         var round = game.Rounds.FirstOrDefault(item => item.RoundId == question.Id);
         if (round?.Choices.Count > 0)
             ImGui.TextDisabled(string.Join("   ", round.Choices));
+        ChatCopy.Button(app, "trivia-question-" + game.InstanceId + "-" + question.Id, TriviaScore.QuestionYell(game, progress, question), "Copy question", "This question is empty.");
 
         var revealed = HostController.IsRevealed(progress, question.Id);
         if (!revealed)
@@ -66,6 +67,9 @@ internal static class TriviaPanel
         }
         else
             ImGui.TextDisabled("No point yet.");
+        ImGui.SameLine();
+        if (Chrome.Button("Announce the point##" + question.Id))
+            AnnouncePoint(app, game, progress, question);
 
         if (Chrome.Button("Previous question"))
             Edit(app, ev, game, edit => TriviaScore.Move(game, edit, -1));
@@ -124,7 +128,7 @@ internal static class TriviaPanel
             else
             {
                 Edit(app, ev, game, edit => edit.RegistrationOpen = true);
-                app.Note("Registration is open. A tell that says " + word + " will add that character.");
+                app.Note("Registration is open. A tell that says " + word + " will add that character. Capitalization does not matter.");
             }
         }
         else if (progress.RegistrationOpen && Chrome.Button("Close registration"))
@@ -355,6 +359,28 @@ internal static class TriviaPanel
             ImGui.TextColored(ThemeHolder.Gold, "Leader: " + leaders[0].Label + " (" + leaders[0].Points + ")");
         else
             ImGui.TextColored(ThemeHolder.Gold, "Tied: " + string.Join(", ", leaders.Select(row => row.Label)) + " (" + leaders[0].Points + ")");
+    }
+
+    public static void AnnouncePoint(HorizonApp app, GameInstance game, GameProgress progress, TriviaQuestion question)
+    {
+        var lines = TriviaScore.PointYell(game, progress, question);
+        if (lines.Count == 0)
+        {
+            app.Fail("Award the point before announcing it.");
+            return;
+        }
+
+        try
+        {
+            foreach (var line in lines)
+                CrowdYell.Send(line);
+            app.Note("Announced in yell.");
+        }
+        catch (Exception ex)
+        {
+            app.Log.Error(ex, "Could not yell the trivia point.");
+            app.Fail(ex.Message);
+        }
     }
 
     private static void Give(HorizonApp app, EventDocument ev, GameInstance game, string questionId, string? playerId)
