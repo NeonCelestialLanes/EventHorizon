@@ -550,36 +550,8 @@ internal static class LiveHostPanel
         ImGui.SameLine();
         ImGui.TextUnformatted(upcoming?.Name ?? "—");
 
-        var script = current?.ScriptId is null ? null : ev.Scripts.FirstOrDefault(item => item.ScriptId == current.ScriptId);
-        Chrome.Section("Current script");
-        var scriptScale = app.Store.Config.UiScale;
-        ImGui.SetWindowFontScale(1f);
-        var scriptFont = app.ScriptFace?.Push(scriptScale, app.Store.Config.ScriptFontScale) == true;
-        if (!scriptFont)
-            ImGui.SetWindowFontScale(scriptScale);
-        ImGui.PushStyleColor(ImGuiCol.ChildBg, ThemeHolder.Panel);
-        ImGui.BeginChild("live-script", new Vector2(0, 220), true);
-        if (script is null)
-            ImGui.TextDisabled("This activity has no script.");
-        else
-        {
-            if (!string.IsNullOrWhiteSpace(script.StageDirections))
-                ImGui.TextColored(ThemeHolder.Gold, script.StageDirections);
-            ImGui.TextWrapped(script.SpokenText);
-        }
+        LiveScriptView.Draw(app, ev, state, current);
 
-        ImGui.EndChild();
-        ImGui.PopStyleColor();
-        if (scriptFont)
-            app.ScriptFace?.Pop();
-        ImGui.SetWindowFontScale(scriptScale);
-
-        if (Chrome.Button("Previous"))
-            app.Previous();
-        ImGui.SameLine();
-        if (Chrome.Accent("Next"))
-            app.Advance();
-        ImGui.SameLine();
         if (current is not null && Chrome.Button("Mark complete"))
         {
             HostController.Complete(state, current.ActivityId);
@@ -588,21 +560,11 @@ internal static class LiveHostPanel
 
         var openGame = OpenGame(ev, state, current);
         var openRound = openGame is null ? null : HostController.CurrentRound(openGame, HostController.PeekGame(state, openGame.InstanceId));
-        IReadOnlyList<string> announcements;
-        string copyKey;
         if (!string.IsNullOrWhiteSpace(openRound?.Announcement))
         {
-            announcements = ChatLines.Yells(openRound.Announcement);
-            copyKey = "live-round-" + openRound.RoundId;
+            ImGui.SameLine();
+            ChatCopy.Button(app, "live-round-" + openRound.RoundId, ChatLines.Yells(openRound.Announcement), "Copy round", "There is no chat announcement to copy.");
         }
-        else
-        {
-            announcements = current?.ScriptId is null ? [] : ChatLines.Section(ev.Scripts, current.ScriptId);
-            copyKey = "live-" + (current?.ScriptId is null ? "none" : ChatLines.SectionRoot(ev.Scripts, current.ScriptId));
-        }
-
-        ImGui.SameLine();
-        ChatCopy.Button(app, copyKey, announcements, "Copy announcement", "There is no chat announcement to copy.");
 
         ImGui.SameLine();
         if (current?.GameInstanceId is not null && Chrome.Button("Open game"))

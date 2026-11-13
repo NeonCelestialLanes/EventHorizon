@@ -4,6 +4,8 @@ namespace EventHorizon.Hosting;
 
 internal static class ChatLines
 {
+    public const int YellLimit = 500;
+
     public static IReadOnlyList<string> Yells(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
@@ -42,7 +44,7 @@ internal static class ChatLines
 
     public static string SectionRoot(IReadOnlyList<ScriptDocument> scripts, string scriptId)
     {
-        if (TryFollow(scriptId, out var root, out _) && scripts.Any(script => script.ScriptId == root))
+        if (Follow(scriptId, out var root, out _) && scripts.Any(script => script.ScriptId == root))
             return root;
         return scriptId;
     }
@@ -62,7 +64,7 @@ internal static class ChatLines
                 continue;
             }
 
-            if (TryFollow(script.ScriptId, out var parent, out var number) && parent == root)
+            if (Follow(script.ScriptId, out var parent, out var number) && parent == root)
                 members.Add((number, script.Announcement));
         }
 
@@ -81,7 +83,7 @@ internal static class ChatLines
         return after >= text.Length || !char.IsLetterOrDigit(text[after]);
     }
 
-    private static bool TryFollow(string scriptId, out string root, out int number)
+    public static bool Follow(string scriptId, out string root, out int number)
     {
         root = "";
         number = 0;

@@ -394,6 +394,95 @@ Check("manual progression", () =>
     Require(state.CurrentActivityId == "act-nova", "next is the DJ");
 });
 
+Check("full script", () =>
+{
+    var scripts = new List<ScriptDocument>
+    {
+        new()
+        {
+            ScriptId = "scr-open",
+            SpokenText = string.Join("\n\n", Enumerable.Range(1, 8).Select(number => "Paragraph " + number + " of the opening.")),
+            Announcement = "/yell Paragraph 1 of the opening.",
+        },
+    };
+    for (var number = 2; number <= 8; number++)
+    {
+        scripts.Add(new ScriptDocument
+        {
+            ScriptId = "scr-open-chat-" + number,
+            SpokenText = "Paragraph " + number + " of the opening.",
+            Announcement = "/yell Paragraph " + number + " of the opening.",
+        });
+    }
+
+    var opening = ScriptSpeech.Paragraphs(scripts, "scr-open-chat-5");
+    Require(opening.Count == 8, "eight paragraphs from the middle of the speech");
+    Require(opening.All(paragraph => paragraph.Yell.StartsWith("/yell ", StringComparison.Ordinal) && paragraph.Parts.Count >= 1), "every paragraph has a yell");
+    Require(!ScriptSpeech.SpokenScript(opening).Contains("/yell", StringComparison.Ordinal), "the spoken script has no yell prefix");
+    Require(opening[7].Spoken.Contains("Paragraph 8", StringComparison.Ordinal), "the last paragraph is kept");
+
+    var many = Enumerable.Range(1, 20).Select(number => new ScriptDocument
+    {
+        ScriptId = number == 1 ? "scr-long" : "scr-long-chat-" + number,
+        SpokenText = "Line " + number + ".",
+        Announcement = "/yell Line " + number + ".",
+    }).ToList();
+    Require(ScriptSpeech.Paragraphs(many, "scr-long").Count == 20, "twenty paragraphs");
+    Require(ScriptSpeech.Paragraphs(many, "scr-long-chat-20").Count == 20, "the last continuation still shows all twenty");
+
+    var one = ScriptSpeech.Paragraphs([new ScriptDocument { ScriptId = "scr-one", SpokenText = "Hello there.", Announcement = "Hello there." }], "scr-one");
+    Require(one.Count == 1 && one[0].Yell == "/yell Hello there.", one[0].Yell);
+
+    var body = string.Join(" ", Enumerable.Range(0, 40).Select(number => "Sentence " + number + " stays intact."));
+    var fitted = ScriptSpeech.Fit("/yell " + body);
+    Require(fitted.Count > 1 && fitted.All(line => line.StartsWith("/yell ", StringComparison.Ordinal) && line.Length <= ChatLines.YellLimit), "a long yell splits inside the chat limit");
+    Require(string.Join(" ", fitted.Select(line => line["/yell ".Length..])) == body, "splitting does not drop words");
+
+    var ev = new EventDocument
+    {
+        EventId = "evt-speech",
+        Date = "2026-11-14",
+        Timezone = "America/New_York",
+        Scripts = scripts,
+        Schedule =
+        [
+            new ScheduleActivity { ActivityId = "act-open", ScriptId = "scr-open", StartTime = "15:00", EndTime = "15:05", Title = "Opening" },
+            new ScheduleActivity { ActivityId = "act-open-2", ScriptId = "scr-open-chat-2", StartTime = "15:00", EndTime = "15:00", Title = "Opening continued" },
+            new ScheduleActivity { ActivityId = "act-open-8", ScriptId = "scr-open-chat-8", StartTime = "15:00", EndTime = "15:00", Title = "Opening continued 8" },
+            new ScheduleActivity { ActivityId = "act-dj", ScriptId = "scr-dj", StartTime = "15:05", EndTime = "16:00", Title = "DJ" },
+        ],
+    };
+    ev.Scripts.Add(new ScriptDocument { ScriptId = "scr-dj", SpokenText = "Here is the DJ.", Announcement = "/yell Here is the DJ." });
+    var state = new LiveEventState { CurrentActivityId = "act-open" };
+    HostController.Advance(ev, state);
+    Require(state.CurrentActivityId == "act-dj", "next activity leaves the whole speech");
+    Require(ScheduleOrder.StatusOf(ev.Schedule.First(item => item.ActivityId == "act-open-8"), state) == ActivityProgressStatus.Completed, "continuation slots finish with the speech");
+    var cursor = new SpeechCursor { Index = 2, Copied = [0, 1] };
+    state.Speeches["scr-open"] = cursor;
+    var saved = System.Text.Json.JsonSerializer.Serialize(state, JsonIo.Options);
+    var loaded = System.Text.Json.JsonSerializer.Deserialize<LiveEventState>(saved, JsonIo.Options);
+    Require(loaded!.Speeches["scr-open"].Index == 2 && loaded.Speeches["scr-open"].Copied.Count == 2, "progress survives a reload");
+
+    var partyPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVLauncher", "pluginConfigs", "EventHorizon", "Events", "evt-aetherphone-gathering-2026-11-14.json");
+    if (!File.Exists(partyPath))
+        return;
+    var party = JsonIo.Read<EventDocument>(partyPath)!;
+    var welcome = ScriptSpeech.Paragraphs(party.Scripts, "scr-welcome");
+    Require(welcome.Count == 8, "the 3:00 opening shows " + welcome.Count + " paragraphs");
+    Require(welcome[0].Yell.Contains("three o'clock", StringComparison.Ordinal), welcome[0].Yell);
+    Require(welcome[7].Spoken.Contains("fantastic afternoon", StringComparison.Ordinal), welcome[7].Spoken);
+    Require(ScriptSpeech.Paragraphs(party.Scripts, "scr-welcome-chat-8").Count == 8, "opening continuation shows all eight");
+    Require(welcome.All(paragraph => paragraph.Yell.StartsWith("/yell ", StringComparison.Ordinal)), "opening yells");
+    Require(!ScriptSpeech.SpokenScript(welcome).Contains("/yell", StringComparison.Ordinal), "opening spoken text stays readable");
+    var close = ScriptSpeech.Paragraphs(party.Scripts, "scr-close");
+    Require(close.Count >= 8, "the closing speech shows " + close.Count + " paragraphs");
+    var exported = System.Text.Json.JsonSerializer.Serialize(party, JsonIo.Options);
+    var imported = System.Text.Json.JsonSerializer.Deserialize<EventDocument>(exported, JsonIo.Options)!;
+    Require(imported.Scripts.Count == party.Scripts.Count && imported.Schedule.Count == party.Schedule.Count, "export keeps every script and activity");
+    Require(ScriptSpeech.Paragraphs(imported.Scripts, "scr-welcome").Count == 8, "reimport keeps the opening");
+    Require(imported.Games.Count == party.Games.Count && imported.Prizes.Count == party.Prizes.Count && imported.Djs.Count == party.Djs.Count, "games, prizes, and DJs stay");
+});
+
 var temp = Path.Combine(Path.GetTempPath(), "event-horizon-verify-" + Guid.NewGuid().ToString("N"));
 failed += StoreTests(temp);
 

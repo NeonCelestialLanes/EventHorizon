@@ -576,6 +576,8 @@ public sealed class LiveEventState
 
     public List<string> QuickNotes { get; set; } = [];
 
+    public Dictionary<string, SpeechCursor> Speeches { get; set; } = new(StringComparer.Ordinal);
+
     public void Normalize()
     {
         this.Activities ??= new(StringComparer.Ordinal);
@@ -586,10 +588,30 @@ public sealed class LiveEventState
         this.ReadScriptIds ??= [];
         this.RevealedClueIds ??= [];
         this.QuickNotes ??= [];
+        this.Speeches ??= new(StringComparer.Ordinal);
+        foreach (var speech in this.Speeches.Values)
+            speech.Normalize();
         foreach (var game in this.Games.Values)
             game.Normalize();
         foreach (var prize in this.Prizes.Values)
             prize.Normalize();
+    }
+}
+
+public sealed class SpeechCursor
+{
+    public int Index { get; set; }
+
+    public List<int> Copied { get; set; } = [];
+
+    public List<int> Delivered { get; set; } = [];
+
+    public void Normalize()
+    {
+        this.Copied ??= [];
+        this.Delivered ??= [];
+        if (this.Index < 0)
+            this.Index = 0;
     }
 }
 

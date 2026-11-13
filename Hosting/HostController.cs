@@ -27,7 +27,11 @@ internal static class ScheduleOrder
         if (index < 0)
             return ordered.FirstOrDefault(activity => StatusOf(activity, state) is not (ActivityProgressStatus.Completed or ActivityProgressStatus.Skipped));
 
-        return ordered.Skip(index + 1).FirstOrDefault(activity => StatusOf(activity, state) is not (ActivityProgressStatus.Completed or ActivityProgressStatus.Skipped));
+        var root = ScriptSpeech.Root(ev.Scripts, ordered[index].ScriptId);
+        return ordered.Skip(index + 1).FirstOrDefault(activity =>
+            StatusOf(activity, state) is not (ActivityProgressStatus.Completed or ActivityProgressStatus.Skipped)
+            && ScriptSpeech.Root(ev.Scripts, activity.ScriptId) != root
+            && !ScriptSpeech.IsFollowOn(ev.Scripts, activity.ScriptId));
     }
 
     public static ScheduleActivity? Suggested(EventDocument ev, LiveEventState state, DateTimeOffset now)
@@ -37,6 +41,8 @@ internal static class ScheduleOrder
         foreach (var activity in ev.Schedule)
         {
             if (StatusOf(activity, state) is ActivityProgressStatus.Completed or ActivityProgressStatus.Skipped)
+                continue;
+            if (ScriptSpeech.IsFollowOn(ev.Scripts, activity.ScriptId))
                 continue;
 
             var start = EventClock.EffectiveStart(ev, activity, state);
@@ -66,7 +72,7 @@ internal static class ScheduleOrder
                 continue;
             if (StatusOf(activity, state) is ActivityProgressStatus.Completed or ActivityProgressStatus.Skipped)
                 continue;
-            if (activity.ActivityId == state.CurrentActivityId)
+            if (activity.ActivityId == state.CurrentActivityId || ScriptSpeech.IsFollowOn(ev.Scripts, activity.ScriptId))
                 continue;
 
             var start = EventClock.EffectiveStart(ev, activity, state);
@@ -114,25 +120,22 @@ internal static class HostController
             return true;
         }
 
-        var status = ScheduleOrder.StatusOf(ordered[index], state);
-        if (status is not (ActivityProgressStatus.Completed or ActivityProgressStatus.Skipped))
-            Set(state, ordered[index].ActivityId, ActivityProgressStatus.Completed);
-
-        if (index + 1 >= ordered.Count)
+        FinishSpeech(ev, state, ordered[index]);
+        var next = ScriptSpeech.NextActivity(ev, state);
+        if (next is null)
             return true;
 
-        Focus(ev, state, ordered[index + 1]);
+        Focus(ev, state, next);
         return true;
     }
 
     public static bool Previous(EventDocument ev, LiveEventState state)
     {
-        var ordered = ScheduleOrder.Sort(ev);
-        var index = ordered.FindIndex(activity => activity.ActivityId == state.CurrentActivityId);
-        if (index <= 0)
+        var previous = ScriptSpeech.PreviousActivity(ev, state);
+        if (previous is null)
             return false;
 
-        Focus(ev, state, ordered[index - 1]);
+        Focus(ev, state, previous);
         return true;
     }
 
@@ -625,6 +628,21 @@ internal static class HostController
             return null;
 
         return ev.Djs.FirstOrDefault(dj => dj.DjId == activity.DjId);
+    }
+
+    private static void FinishSpeech(EventDocument ev, LiveEventState state, ScheduleActivity current)
+    {
+        var root = ScriptSpeech.Root(ev.Scripts, current.ScriptId);
+        foreach (var activity in ev.Schedule)
+        {
+            var same = activity.ActivityId == current.ActivityId
+                || (root.Length > 0 && ScriptSpeech.Root(ev.Scripts, activity.ScriptId) == root);
+            if (!same)
+                continue;
+            if (ScheduleOrder.StatusOf(activity, state) is ActivityProgressStatus.Completed or ActivityProgressStatus.Skipped)
+                continue;
+            Set(state, activity.ActivityId, ActivityProgressStatus.Completed);
+        }
     }
 
     private static void Focus(EventDocument ev, LiveEventState state, ScheduleActivity activity)

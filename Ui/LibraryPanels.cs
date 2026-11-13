@@ -446,10 +446,30 @@ internal static class ScriptEditor
         if (Chrome.Area("Host notes", script.HostNotes, value => script.HostNotes = value, 40))
             changed();
         var prompts = ev is null
-            ? ChatLines.Yells(script.Announcement)
-            : ChatLines.Section(ev.Scripts, script.ScriptId);
-        var copyKey = ev is null ? "announce-" + script.ScriptId : "announce-" + ChatLines.SectionRoot(ev.Scripts, script.ScriptId);
-        ChatCopy.Button(app, copyKey, prompts, "Copy announcement", "This script has no chat announcement.");
+            ? ScriptSpeech.Paragraphs([script], script.ScriptId)
+            : ScriptSpeech.Paragraphs(ev.Scripts, script.ScriptId);
+        if (prompts.Count == 0)
+        {
+            if (Chrome.Button("Copy announcement##" + script.ScriptId))
+                app.Fail("This script has no chat announcement.");
+        }
+        else
+        {
+            for (var paragraphIndex = 0; paragraphIndex < prompts.Count; paragraphIndex++)
+            {
+                var paragraph = prompts[paragraphIndex];
+                for (var part = 0; part < paragraph.Parts.Count; part++)
+                {
+                    var caption = prompts.Count == 1 && paragraph.Parts.Count == 1
+                        ? "Copy announcement"
+                        : "Copy " + (paragraphIndex + 1) + (paragraph.Parts.Count == 1 ? "" : " part " + (part + 1));
+                    if (!Chrome.Button(caption + "##lib-" + script.ScriptId + "-" + paragraphIndex + "-" + part))
+                        continue;
+                    ImGui.SetClipboardText(paragraph.Parts[part]);
+                    app.Note("Copied.");
+                }
+            }
+        }
 
         if (ev is not null)
         {
