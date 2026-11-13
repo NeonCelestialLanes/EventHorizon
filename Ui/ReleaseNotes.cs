@@ -22,6 +22,22 @@ internal static class ReleaseNotes
     [
         new ReleaseNote
         {
+            Version = "1.0.2",
+            Title = "The EH logo is in the plugin list.",
+            Sections =
+            [
+                new ReleaseSection
+                {
+                    Heading = "New",
+                    Lines =
+                    [
+                        "Dalamud shows the Event Horizon logo in the plugin search.",
+                    ],
+                },
+            ],
+        },
+        new ReleaseNote
+        {
             Version = "1.0.1",
             Title = "What's new opens after an update.",
             Sections =
