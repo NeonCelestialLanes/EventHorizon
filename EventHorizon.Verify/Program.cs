@@ -527,6 +527,60 @@ Check("full script", () =>
     Require(imported.Games.Count == party.Games.Count && imported.Prizes.Count == party.Prizes.Count && imported.Djs.Count == party.Djs.Count, "games, prizes, and DJs stay");
 });
 
+Check("edit wrap", () =>
+{
+    static float Width(string value) => value.Length;
+    static string Shown(string value, IReadOnlyList<TextLine> lines) =>
+        string.Join("|", lines.Select(line => value[line.Start..line.End]));
+
+    var wrapped = WrappedBox.Layout("hello world", 5, Width);
+    Require(Shown("hello world", wrapped) == "hello|world", Shown("hello world", wrapped));
+    var kept = WrappedBox.Layout("one\ntwo", 80, Width);
+    Require(kept.Count == 2 && kept[0].Hard && kept[0].End == 3 && kept[1].Start == 4, "a typed line break stays");
+    var word = WrappedBox.Layout("abcdef", 3, Width);
+    Require(Shown("abcdef", word) == "abc|def", Shown("abcdef", word));
+    var blank = WrappedBox.Layout("a\n\nb", 80, Width);
+    Require(blank.Count == 3 && blank[1].Start == blank[1].End, "an empty line stays");
+});
+
+Check("live sync", () =>
+{
+    var local = new LiveEventState();
+    var remote = new LiveEventState();
+    var mine = new GameProgress { RegistrationOpen = true };
+    mine.Players.Add(new PlayerRecord { PlayerId = "ply-nova", Name = "Nova", World = "Sephirot", Eliminated = true, Score = 2 });
+    local.Games["gme-truths"] = mine;
+    var theirs = new GameProgress { RegistrationOpen = true };
+    theirs.Players.Add(new PlayerRecord { PlayerId = "ply-bea", Name = "Bea", World = "Mateus", Score = 1 });
+    remote.Games["gme-truths"] = theirs;
+    var merged = LiveMerge.Apply(local, remote, remoteNewer: true);
+    var players = merged.Games["gme-truths"].Players;
+    Require(players.Any(player => player.Name == "Nova" && player.Eliminated && player.Score == 2), "a local registration survives a newer snapshot");
+    Require(players.Any(player => player.Name == "Bea" && player.Score == 1), "the other planner's player arrives");
+    Require(LiveMerge.Differs(merged, remote), "the combined roster is sent back");
+    var older = LiveMerge.Apply(local, remote, remoteNewer: false);
+    Require(older.Games["gme-truths"].Players.Count == 1 && older.Games["gme-truths"].Players[0].Name == "Nova", "an older snapshot does not wipe the roster");
+});
+
+Check("send winner", () =>
+{
+    var ev = new EventDocument
+    {
+        EventId = "evt-send",
+        EventName = "Party",
+        Date = "2026-11-14",
+        Prizes = [new PrizeEntry { PrizeId = "prz-send", RewardType = RewardType.AetherCoins, Amount = 1250 }],
+    };
+    var game = new GameInstance { InstanceId = "gme-send", Name = "Send or Delete", PrizeId = "prz-send" };
+    var progress = new GameProgress();
+    progress.Players.Add(new PlayerRecord { PlayerId = "ply-1", Name = "Nova", World = "Sephirot", Eliminated = true });
+    progress.Players.Add(new PlayerRecord { PlayerId = "ply-2", Name = "Bea", World = "Mateus" });
+    var yell = SendOrDelete.Yell(ev, game, progress);
+    Require(yell.StartsWith("/yell ", StringComparison.Ordinal) && yell.Contains("Bea (Mateus)") && yell.Contains("1,250 Aether Coins") && !yell.Contains("[WINNER]"), yell);
+    progress.Players[1].Eliminated = true;
+    Require(SendOrDelete.Yell(ev, game, progress).Length == 0, "nobody left standing");
+});
+
 var temp = Path.Combine(Path.GetTempPath(), "event-horizon-verify-" + Guid.NewGuid().ToString("N"));
 failed += StoreTests(temp);
 

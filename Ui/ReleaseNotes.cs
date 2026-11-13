@@ -22,6 +22,25 @@ internal static class ReleaseNotes
     [
         new ReleaseNote
         {
+            Version = "1.0.5",
+            Title = "Points, a winner yell, and live sync.",
+            Sections =
+            [
+                new ReleaseSection
+                {
+                    Heading = "New",
+                    Lines =
+                    [
+                        "Two Truths and a Chirp has points again. Eliminated still sits a player down.",
+                        "Send or Delete has Announce the winner. It yells the last player standing and the prize.",
+                        "Live sync keeps registrations, eliminations, and points from both planners.",
+                        "The edit boxes wrap long lines.",
+                    ],
+                },
+            ],
+        },
+        new ReleaseNote
+        {
             Version = "1.0.4",
             Title = "Open a game in its own window.",
             Sections =

@@ -186,7 +186,7 @@ internal static class Chrome
     {
         Caption(label);
         var buffer = value ?? "";
-        if (!ImGui.InputTextMultiline(InputId(label), ref buffer, max, new Vector2(-1, height)))
+        if (!WrappedBox.Edit(InputId(label), ref buffer, max, height))
             return false;
 
         set(buffer.Length == 0 ? null : buffer);
@@ -197,7 +197,7 @@ internal static class Chrome
     {
         Caption(label);
         var buffer = value ?? "";
-        if (!ImGui.InputTextMultiline(InputId(label), ref buffer, max, new Vector2(-1, height)))
+        if (!WrappedBox.Edit(InputId(label), ref buffer, max, height))
             return false;
 
         set(buffer);

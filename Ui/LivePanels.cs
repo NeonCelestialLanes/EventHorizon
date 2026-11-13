@@ -120,6 +120,12 @@ internal static class GameBoard
         ImGui.SameLine();
         if (Chrome.Button("Next"))
             Mutate(app, ev, game, edit => HostController.NextRound(game, edit));
+        if (SendOrDelete.Is(game))
+        {
+            ImGui.SameLine();
+            if (Chrome.Button("Announce the winner"))
+                AnnounceWinner(app, ev, game, progress);
+        }
     }
 
     private static void Prompt(HorizonApp app, GameRound round)
@@ -309,6 +315,34 @@ internal static class GameBoard
         }
     }
 
+    private static bool TracksPoints(GameInstance game)
+    {
+        var name = game.Name ?? "";
+        return name.Contains("two truth", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void AnnounceWinner(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress)
+    {
+        var yell = SendOrDelete.Yell(ev, game, progress);
+        if (yell.Length == 0)
+        {
+            app.Fail("Leave one player standing before announcing the winner.");
+            return;
+        }
+
+        try
+        {
+            foreach (var line in ScriptSpeech.Fit(yell))
+                CrowdYell.Send(line);
+            app.Note("Announced the winner.");
+        }
+        catch (Exception ex)
+        {
+            app.Log.Error(ex, "Could not yell the Send or Delete winner.");
+            app.Fail(ex.Message);
+        }
+    }
+
     private static bool KeepsScore(GameInstance game)
     {
         if (game.Formats.Contains(GameFormat.Points) || game.Formats.Contains(GameFormat.QuestionAnswer))
@@ -346,13 +380,20 @@ internal static class GameBoard
 
         if (!scored)
         {
-            var standing = progress.Players.Where(player => !player.Eliminated && !string.IsNullOrWhiteSpace(player.Name)).Select(player => player.Name.Trim()).ToList();
+            var points = TracksPoints(game);
+            var standing = progress.Players.Where(player => !player.Eliminated && !string.IsNullOrWhiteSpace(player.Name)).Select(player => points ? player.Name.Trim() + " (" + player.Score + ")" : player.Name.Trim()).ToList();
             if (progress.Winners.Count == 1)
-                ImGui.TextColored(ThemeHolder.Gold, "Winner: " + progress.Winners[0]);
+            {
+                var winner = progress.Winners[0];
+                var score = progress.Players.FirstOrDefault(player => player.Name.Trim() == winner)?.Score;
+                ImGui.TextColored(ThemeHolder.Gold, points && score is not null ? "Winner: " + winner + " (" + score + ")" : "Winner: " + winner);
+            }
             else if (standing.Count > 1)
                 ImGui.TextUnformatted("Still in: " + string.Join(", ", standing));
             else if (progress.Players.Any(player => !string.IsNullOrWhiteSpace(player.Name)))
                 Chrome.Muted("Everyone is sitting down.");
+            if (SendOrDelete.Is(game) && Chrome.Button("Announce the winner"))
+                AnnounceWinner(app, ev, game, progress);
         }
 
         string? remove = null;
@@ -400,6 +441,21 @@ internal static class GameBoard
             }
             else
             {
+                if (TracksPoints(game))
+                {
+                    ImGui.TextDisabled("Points");
+                    ImGui.SameLine();
+                    var score = player.Score;
+                    ImGui.SetNextItemWidth(70);
+                    if (ImGui.InputInt("##points", ref score))
+                    {
+                        var written = score;
+                        Mutate(app, ev, game, edit => edit.Players.First(item => item.PlayerId == player.PlayerId).Score = written);
+                    }
+
+                    ImGui.SameLine();
+                }
+
                 var eliminated = player.Eliminated;
                 if (ImGui.Checkbox("Eliminated", ref eliminated))
                 {

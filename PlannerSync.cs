@@ -6,6 +6,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using EventHorizon.Hosting;
 using EventHorizon.Models;
 using EventHorizon.Persistence;
 
@@ -255,15 +256,30 @@ internal sealed class PlannerSync : IDisposable
         if (ev is null || state is null)
             return;
 
+        var remoteNewer = message.Revision >= this.revision;
+        var chosenEvent = ev;
+        var chosenState = state;
+        var sendBack = false;
+        if (this.store.Events.ContainsKey(ev.EventId))
+        {
+            var localEvent = this.store.Events[ev.EventId];
+            var localState = this.store.StateFor(ev.EventId);
+            chosenEvent = remoteNewer ? ev : localEvent;
+            chosenState = LiveMerge.Apply(localState, state, remoteNewer);
+            sendBack = LiveMerge.Differs(chosenState, state);
+        }
+
         this.applying = true;
         try
         {
-            this.store.ApplySync(ev, state);
-            this.sharedEventId = ev.EventId;
+            this.store.ApplySync(chosenEvent, chosenState);
+            this.sharedEventId = chosenEvent.EventId;
             if (message.Revision > this.revision)
                 this.revision = message.Revision;
+            if (sendBack)
+                this.pending = true;
             this.Error = null;
-            this.Status = "Live with the other planners. " + ev.EventName + " is updating as they edit.";
+            this.Status = "Live with the other planners. " + chosenEvent.EventName + " is updating as they edit.";
         }
         catch (Exception)
         {
@@ -300,8 +316,8 @@ internal sealed class PlannerSync : IDisposable
             Code = this.Code ?? "",
             Origin = this.origin,
             Revision = revision,
-            EventJson = JsonSerializer.Serialize(ev, JsonIo.Options),
-            StateJson = JsonSerializer.Serialize(state, JsonIo.Options),
+            EventJson = JsonSerializer.Serialize(ev, Line),
+            StateJson = JsonSerializer.Serialize(state, Line),
         };
         return JsonSerializer.Serialize(message, Line);
     }
