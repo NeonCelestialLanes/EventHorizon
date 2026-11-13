@@ -151,6 +151,27 @@ internal static class GameBoard
             ImGui.TextDisabled(round.ImagePath);
     }
 
+    private static string ChirpLabel(string choice)
+    {
+        var text = choice.Trim();
+        return text.Length > 0 && char.IsLetter(text[0]) && (text.Length == 1 || text[1] is '.' or ')' or ':')
+            ? text[0].ToString()
+            : "the chirp";
+    }
+
+    private static string ChirpText(string choice)
+    {
+        var text = choice.Trim();
+        if (text.Length >= 2 && char.IsLetter(text[0]) && text[1] is '.' or ')' or ':')
+        {
+            var body = text[2..].Trim();
+            if (body.Length > 0)
+                return body;
+        }
+
+        return text;
+    }
+
     private static string CrowdChirp(GameRound round, string chirp)
     {
         var choices = round.Choices.Where(choice => !string.IsNullOrWhiteSpace(choice)).ToList();
@@ -162,11 +183,31 @@ internal static class GameBoard
 
     private static void Choices(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress, GameRound round)
     {
+        var lettered = round.Choices.Any(choice => ChirpLabel(choice).Length == 1);
+        if (lettered && Chrome.Button("Copy cue"))
+        {
+            var cue = RoundCue.Paste(ev.Scripts, round);
+            if (string.IsNullOrWhiteSpace(cue))
+                app.Fail("This round has no cue to copy.");
+            else
+            {
+                ImGui.SetClipboardText(cue);
+                app.Note("Copied the round cue.");
+            }
+        }
+
         foreach (var choice in round.Choices.Where(choice => !string.IsNullOrWhiteSpace(choice)))
         {
             var fill = Chrome.Mix(ThemeHolder.Button, ThemeHolder.Accent, 0.28f);
             var hover = Chrome.Mix(ThemeHolder.ButtonHover, ThemeHolder.Accent, 0.4f);
-            Chrome.Button(choice, new Vector2(Math.Max(120, ImGui.CalcTextSize(choice).X + 24), 0), fill, ThemeHolder.Text, hover);
+            var label = ChirpLabel(choice);
+            if (Chrome.Button(choice, new Vector2(Math.Max(120, ImGui.CalcTextSize(choice).X + 24), 0), fill, ThemeHolder.Text, hover) && (label.Length == 1 || !KeepsScore(game)))
+            {
+                var chirp = ChirpText(choice);
+                ImGui.SetClipboardText(chirp);
+                app.Note(string.IsNullOrWhiteSpace(chirp) ? "This chirp is empty." : "Copied " + label + ".");
+            }
+
             if (!game.Formats.Contains(GameFormat.Voting))
                 continue;
 
@@ -183,7 +224,9 @@ internal static class GameBoard
         }
 
         if (round.Choices.Count > 0)
-            Chrome.Muted("Choosing an option does not reveal the answer or change a score.");
+            Chrome.Muted(KeepsScore(game)
+                ? "Choosing an option does not reveal the answer or change a score."
+                : "Click A, B, or C to copy that chirp. The answer stays hidden.");
     }
 
     private static void Answer(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress, GameRound round)
@@ -266,10 +309,15 @@ internal static class GameBoard
         }
     }
 
-    private static bool KeepsScore(GameInstance game) =>
-        game.Formats.Contains(GameFormat.Points)
-        || game.Formats.Contains(GameFormat.QuestionAnswer)
-        || (game.ScoringMethod ?? "").Contains("point", StringComparison.OrdinalIgnoreCase);
+    private static bool KeepsScore(GameInstance game)
+    {
+        if (game.Formats.Contains(GameFormat.Points) || game.Formats.Contains(GameFormat.QuestionAnswer))
+            return true;
+
+        var method = game.ScoringMethod ?? "";
+        return !method.Contains("no point", StringComparison.OrdinalIgnoreCase)
+            && method.Contains("point", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static void Players(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress)
     {

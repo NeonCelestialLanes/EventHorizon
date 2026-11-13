@@ -90,6 +90,14 @@ Check("uno registration", () =>
     Require(TellSignup.Word(sendWord) == "send" && TellSignup.Matches(sendWord, " SEND ") && TellSignup.Matches(sendWord, "SeNd") && !TellSignup.Matches(sendWord, "delete"), "send tell");
     var truthsWord = new GameInstance { Name = "Two Truths and a Chirp", Formats = [GameFormat.MultipleChoice], TellWord = "truths" };
     Require(TellSignup.Word(truthsWord) == "truths" && TellSignup.Matches(truthsWord, "truths") && !TellSignup.Matches(truthsWord, "chirp"), "truths tell");
+    var cueScript = new ScriptDocument
+    {
+        ScriptId = "scr-cues",
+        SpokenText = "All right, let's hear our three Chirps!\n\nA: [READ CHIRP A]\n\nB: [READ CHIRP B]\n\nC: [READ CHIRP C]\n\nSo, which one?\n\nAnd the fake Chirp was... [ANSWER]!",
+    };
+    var cueRound = new GameRound { Choices = ["A: Red glamour.", "B: Named a minion.", "C: Three chairs."] };
+    var cue = RoundCue.Paste([cueScript], cueRound);
+    Require(cue.Contains("A: Red glamour.") && cue.Contains("B: Named a minion.") && cue.Contains("let's hear our three Chirps") && !cue.Contains("[ANSWER]") && !cue.Contains("[READ CHIRP"), cue);
     var tags = new[] { "Velvet", "Lantern", "Harbor" };
     Require(CollectTell.SameWords(tags, "harbor VELVET lantern") && CollectTell.SameWords(tags, "velvet, lantern, harbor."), "collect tell");
     Require(!CollectTell.SameWords(tags, "velvet lantern") && !CollectTell.SameWords(tags, "velvet lantern harbor extra"), "incomplete collect tell");
