@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "templateId": "tpl-collect-tags",
+  "name": "Collect the Tags",
+  "description": "A list of hidden words. Each one stays hidden until the host reveals it.",
+  "category": "Collection",
+  "formats": ["Collection"],
+  "rules": "Reveal words yourself on the schedule you chose. Pick the winner by hand when someone has the full set. Scheduled times are reminders, not automatic reveals.",
+  "scoringMethod": "Manual winner",
+  "participationMethod": "Open",
+  "rounds": [
+    {
+      "roundId": "rnd-tag-1",
+      "title": "First word",
+      "prompt": "Velvet",
+      "hostNotes": "Suggested reveal 20 minutes after doors.",
+      "extras": { "revealTime": "20:20" }
+    },
+    {
+      "roundId": "rnd-tag-2",
+      "title": "Second word",
+      "prompt": "Lantern",
+      "extras": { "revealTime": "21:20" }
+    },
+    {
+      "roundId": "rnd-tag-3",
+      "title": "Third word",
+      "prompt": "Harbor",
+      "extras": { "revealTime": "22:10" }
+    }
+  ]
+}

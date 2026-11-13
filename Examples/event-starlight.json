@@ -1,0 +1,290 @@
+{
+  "schemaVersion": 1,
+  "eventId": "evt-starlight",
+  "eventName": "Sample Starlight Social",
+  "description": "Example data shipped with Event Horizon. It is a fictional party you can duplicate, edit, or delete. Nothing in the plugin depends on this event.",
+  "date": "2026-12-05",
+  "timezone": "America/New_York",
+  "startTime": "20:00",
+  "endTime": "23:00",
+  "status": "Planned",
+  "venue": {
+    "name": "The Sample Hall",
+    "dataCenter": "Aether",
+    "world": "Jenova",
+    "notes": "A made-up room. Leave ward and plot blank when the party is not in a house."
+  },
+  "organizer": "Rowan Vale",
+  "staff": [
+    { "staffId": "stf-lake", "name": "Lake", "role": "Featured guest" },
+    { "staffId": "stf-moss", "name": "Moss", "role": "Featured guest" },
+    { "staffId": "stf-nova", "name": "Nova", "role": "DJ" },
+    { "staffId": "stf-rio", "name": "Rio", "role": "DJ" }
+  ],
+  "schedule": [
+    {
+      "activityId": "act-welcome",
+      "startTime": "20:00",
+      "endTime": "20:15",
+      "title": "Welcome",
+      "category": "Welcome",
+      "scriptId": "scr-welcome",
+      "hostNotes": "Wait until the room has settled before the first game."
+    },
+    {
+      "activityId": "act-nova",
+      "startTime": "20:15",
+      "endTime": "20:45",
+      "title": "Nova's opening set",
+      "category": "DjSet",
+      "djId": "dj-nova"
+    },
+    {
+      "activityId": "act-send",
+      "startTime": "20:45",
+      "endTime": "21:15",
+      "title": "Send or Delete",
+      "category": "Game",
+      "gameInstanceId": "gme-send",
+      "scriptId": "scr-send",
+      "prizeId": "prz-send"
+    },
+    {
+      "activityId": "act-break",
+      "startTime": "21:15",
+      "endTime": "21:25",
+      "title": "Break",
+      "category": "Break"
+    },
+    {
+      "activityId": "act-truths",
+      "startTime": "21:25",
+      "endTime": "21:55",
+      "title": "Two Truths and a Chirp",
+      "category": "Game",
+      "gameInstanceId": "gme-truths",
+      "prizeId": "prz-truths"
+    },
+    {
+      "activityId": "act-trivia",
+      "startTime": "21:55",
+      "endTime": "22:20",
+      "title": "Trivia",
+      "category": "Game",
+      "gameInstanceId": "gme-trivia"
+    },
+    {
+      "activityId": "act-uno",
+      "startTime": "22:20",
+      "endTime": "22:45",
+      "title": "Uno table",
+      "description": "The plugin only tracks who won each match. Play the cards in the game.",
+      "category": "Game",
+      "gameInstanceId": "gme-uno"
+    },
+    {
+      "activityId": "act-close",
+      "startTime": "22:45",
+      "endTime": "23:00",
+      "title": "Closing",
+      "category": "Closing",
+      "scriptId": "scr-close"
+    }
+  ],
+  "djs": [
+    {
+      "djId": "dj-nova",
+      "name": "Nova",
+      "startTime": "20:15",
+      "endTime": "20:45",
+      "introText": "Nova is opening the room. Give them a warm welcome, then let the set breathe.",
+      "transitionText": "Thank Nova, and keep the energy up while we move to the first game.",
+      "notes": "Do not open the stream link from the plugin. Copy it if you need it."
+    },
+    {
+      "djId": "dj-rio",
+      "name": "Rio",
+      "startTime": "22:45",
+      "endTime": "23:00",
+      "introText": "Rio is taking us out. Introduce them, then read the closing.",
+      "notes": "A short final set under the closing remarks."
+    }
+  ],
+  "games": [
+    {
+      "instanceId": "gme-send",
+      "templateId": "tpl-send-or-delete",
+      "name": "Send or Delete",
+      "description": "Guess whether the featured guest would publish the chirp.",
+      "category": "Party",
+      "formats": ["MultipleChoice", "Points"],
+      "rules": "Read the chirp. The room guesses SEND or DELETE. Reveal the answer yourself. Award points by hand.",
+      "scoringMethod": "Points",
+      "participationMethod": "Open",
+      "prizeId": "prz-send",
+      "rounds": [
+        {
+          "roundId": "rnd-send-1",
+          "title": "Lake's closet",
+          "prompt": "Would Lake publish this?",
+          "featuredStaff": "Lake",
+          "choices": ["SEND", "DELETE"],
+          "correctAnswer": "SEND",
+          "explanation": "Lake says a dramatic closet confession is exactly the point of a public chirp.",
+          "extras": {
+            "chirp": "I don't have a gil problem. I have a very expensive sense of personal style."
+          }
+        },
+        {
+          "roundId": "rnd-send-2",
+          "title": "Moss in the morning",
+          "prompt": "Would Moss publish this?",
+          "featuredStaff": "Moss",
+          "choices": ["SEND", "DELETE"],
+          "correctAnswer": "DELETE",
+          "explanation": "Moss would rather be known for staying up late than for watering flowers at dawn.",
+          "extras": {
+            "chirp": "I woke up early, watered every plant in the apartment, and then went back to bed like a responsible menace."
+          }
+        }
+      ]
+    },
+    {
+      "instanceId": "gme-truths",
+      "templateId": "tpl-two-truths",
+      "name": "Two Truths and a Chirp",
+      "description": "Two posts are real. One was invented for the party.",
+      "category": "Party",
+      "formats": ["MultipleChoice"],
+      "rules": "Read all three. The room picks the fabricated post. Reveal it yourself.",
+      "scoringMethod": "Manual",
+      "participationMethod": "Open",
+      "prizeId": "prz-truths",
+      "rounds": [
+        {
+          "roundId": "rnd-truth-1",
+          "title": "Lake's three posts",
+          "prompt": "Which post did we invent?",
+          "featuredStaff": "Lake",
+          "choices": [
+            "A. Spent the afternoon rearranging the same three chairs.",
+            "B. Won a sabong tournament before breakfast and retired undefeated.",
+            "C. Named a minion after a soup."
+          ],
+          "correctAnswer": "B",
+          "explanation": "B is the invented post. A and C are the ones Lake actually claims.",
+          "extras": {
+            "fabricated": "B"
+          }
+        }
+      ]
+    },
+    {
+      "instanceId": "gme-trivia",
+      "templateId": "tpl-trivia",
+      "name": "Hall trivia",
+      "category": "Trivia",
+      "formats": ["QuestionAnswer", "Points"],
+      "rules": "Read the prompt. Keep the answer hidden until you press Reveal. Scores are manual.",
+      "scoringMethod": "Points",
+      "participationMethod": "Open",
+      "rounds": [
+        {
+          "roundId": "rnd-triv-1",
+          "title": "House lights",
+          "prompt": "The Sample Hall dims the lamps before which part of the night?",
+          "choices": ["Welcome", "First DJ set", "Closing"],
+          "correctAnswer": "First DJ set",
+          "explanation": "This is fictional trivia about the sample event itself."
+        },
+        {
+          "roundId": "rnd-triv-2",
+          "title": "A secret",
+          "prompt": "What did Rowan hide under the welcome table?",
+          "correctAnswer": "A spare box of glow sticks",
+          "explanation": "Question-and-answer rounds do not need choices."
+        }
+      ]
+    },
+    {
+      "instanceId": "gme-uno",
+      "templateId": "tpl-uno",
+      "name": "Uno table",
+      "description": "Track the bracket. The card game happens at the table, not in the plugin.",
+      "category": "Tabletop",
+      "formats": ["Tournament"],
+      "rules": "Add the players, set how many sit at each table, and make the bracket. Click a name when that table finishes. Event Horizon does not deal cards or watch the table.",
+      "scoringMethod": "Single elimination",
+      "participationMethod": "Sign up",
+      "tournament": {
+        "format": "SingleElimination",
+        "seats": 4,
+        "matches": []
+      }
+    }
+  ],
+  "scripts": [
+    {
+      "scriptId": "scr-welcome",
+      "sourceScriptId": "scr-lib-welcome",
+      "title": "Welcome",
+      "category": "Welcome",
+      "stageDirections": "Smile. Let the room quiet down. Do not rush the first joke.",
+      "spokenText": "Welcome to the Sample Starlight Social. I am Rowan, and I will be your host. We have music, a few games, and one contest you can play all night. Grab a seat, say hello to someone new, and I will be back when Nova is ready.",
+      "announcement": "Welcome to the Sample Starlight Social. Games start after Nova's opening set.",
+      "eventId": "evt-starlight",
+      "activityId": "act-welcome"
+    },
+    {
+      "scriptId": "scr-send",
+      "title": "Send or Delete intro",
+      "category": "GameIntroduction",
+      "spokenText": "This game is called Send or Delete. I will read a chirp about Lake or Moss. You decide whether they would publish it or bury it. I will reveal the answer after the room has guessed. Shout SEND or DELETE, and I will keep score up here.",
+      "announcement": "Send or Delete is starting. Guess SEND or DELETE."
+    },
+    {
+      "scriptId": "scr-close",
+      "title": "Closing",
+      "category": "Closing",
+      "spokenText": "That is our night. Thank you for playing, thank you Nova and Rio, and thank you for being kind to each other on the way out. The doors are imaginary, but the gratitude is not. Good night.",
+      "announcement": "Thank you for coming to the Sample Starlight Social. Good night."
+    }
+  ],
+  "contests": [
+    {
+      "contestId": "cst-tags",
+      "title": "Collect the tags",
+      "contestType": "Collection",
+      "rules": "Three words are hidden. They stay hidden until the host reveals each one. The first person to bring all three words to Rowan wins. There is no automatic check.",
+      "startTime": "20:00",
+      "deadline": "22:40",
+      "prizeId": "prz-tags",
+      "submissionMethod": "Tell the host in person",
+      "winnerMethod": "Manual",
+      "notes": "This contest has no schedule block. Reveal clues from Live Host.",
+      "clues": [
+        { "clueId": "clu-velvet", "content": "Velvet", "revealTime": "20:20", "hostNotes": "Hide this until the opening set is underway." },
+        { "clueId": "clu-lantern", "content": "Lantern", "revealTime": "21:20" },
+        { "clueId": "clu-harbor", "content": "Harbor", "revealTime": "22:10" }
+      ]
+    }
+  ],
+  "prizes": [
+    { "prizeId": "prz-send", "gameInstanceId": "gme-send", "rewardType": "Gil", "amount": 50000, "notes": "Hand the gil over yourself." },
+    { "prizeId": "prz-truths", "gameInstanceId": "gme-truths", "rewardType": "Item", "rewardName": "A glow-star hairpin", "allowMultipleWinners": false },
+    { "prizeId": "prz-tags", "contestId": "cst-tags", "rewardType": "AetherCoins", "amount": 100, "allowMultipleWinners": true, "notes": "Split it if two people finish together." }
+  ],
+  "notes": [
+    {
+      "noteId": "nte-room",
+      "title": "Room check",
+      "category": "Planning",
+      "body": "Confirm the lights, the DJ handoff, and that the prize table is labeled. This sample note can be edited or deleted."
+    }
+  ],
+  "checklists": [
+    { "itemId": "chk-prizes", "text": "Set the prizes on the side table", "done": false },
+    { "itemId": "chk-names", "text": "Ask Nova and Rio for the names they want spoken", "done": false },
+    { "itemId": "chk-water", "text": "Put water where the host can reach it", "done": false }
+  ]
+}

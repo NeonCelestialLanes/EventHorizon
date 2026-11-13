@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "templateId": "tpl-uno",
+  "name": "Uno tournament",
+  "description": "A bracket for a card game played at a real table.",
+  "category": "Tabletop",
+  "formats": ["Tournament"],
+  "rules": "Add the players, set how many sit at each table, and make the bracket. Click a name when that table finishes. The plugin does not deal cards or watch the table.",
+  "scoringMethod": "Single elimination",
+  "participationMethod": "Sign up",
+  "hostNotes": "Other table games can use this same template. Change the name and the rules.",
+  "tournament": {
+    "format": "SingleElimination",
+    "seats": 4,
+    "matches": []
+  },
+  "rounds": []
+}

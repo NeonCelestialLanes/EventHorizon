@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eventhorizon.local/schemas/game.schema.json",
+  "title": "Event Horizon game template",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "templateId", "name"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "templateId": { "$ref": "#/$defs/id" },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "category": { "type": "string" },
+    "formats": {
+      "type": "array",
+      "items": {
+        "enum": ["MultipleChoice", "QuestionAnswer", "Elimination", "Points", "Tournament", "Voting", "Collection", "Custom"]
+      }
+    },
+    "rules": { "type": "string" },
+    "introScript": { "type": "string" },
+    "closingScript": { "type": "string" },
+    "defaultPrize": { "type": "string" },
+    "scoringMethod": { "type": "string" },
+    "participationMethod": { "type": "string" },
+    "hostNotes": { "type": "string" },
+    "rounds": { "type": "array", "items": { "$ref": "#/$defs/round" } },
+    "tournament": { "$ref": "#/$defs/tournament" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$" },
+    "round": {
+      "type": "object",
+      "required": ["roundId"],
+      "properties": {
+        "roundId": { "$ref": "#/$defs/id" },
+        "title": { "type": "string" },
+        "prompt": { "type": "string" },
+        "description": { "type": "string" },
+        "choices": { "type": "array", "items": { "type": "string" } },
+        "correctAnswer": { "type": "string" },
+        "explanation": { "type": "string" },
+        "sourceReference": { "type": "string" },
+        "featuredStaff": { "type": "string" },
+        "imagePath": { "type": "string" },
+        "hostNotes": { "type": "string" },
+        "announcement": { "type": "string" },
+        "extras": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "match": {
+      "type": "object",
+      "required": ["matchId"],
+      "properties": {
+        "matchId": { "$ref": "#/$defs/id" },
+        "round": { "type": "integer" },
+        "playerA": { "type": "string" },
+        "playerB": { "type": "string" },
+        "players": { "type": "array", "items": { "type": "string" } },
+        "nextMatchId": { "$ref": "#/$defs/id" },
+        "nextSeat": { "type": "integer" },
+        "winner": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "tournament": {
+      "type": "object",
+      "properties": {
+        "format": { "type": "string" },
+        "seats": { "type": "integer", "minimum": 2, "maximum": 8 },
+        "matches": { "type": "array", "items": { "$ref": "#/$defs/match" } }
+      }
+    }
+  }
+}

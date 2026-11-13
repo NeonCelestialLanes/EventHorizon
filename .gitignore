@@ -1,0 +1,7 @@
+bin/
+obj/
+.vs/
+*.user
+packages.lock.json.bak
+.env
+.env.*

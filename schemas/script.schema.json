@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eventhorizon.local/schemas/script.schema.json",
+  "title": "Event Horizon script",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "scriptId", "title"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "scriptId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$" },
+    "title": { "type": "string", "minLength": 1 },
+    "category": {
+      "enum": [
+        "Welcome",
+        "DjIntroduction",
+        "DjTransition",
+        "GameIntroduction",
+        "GameInstructions",
+        "GameCommentary",
+        "WinnerAnnouncement",
+        "Giveaway",
+        "GeneralAnnouncement",
+        "Closing",
+        "Custom"
+      ]
+    },
+    "spokenText": { "type": "string" },
+    "stageDirections": { "type": "string" },
+    "announcement": { "type": "string" },
+    "eventId": { "type": "string" },
+    "activityId": { "type": "string" },
+    "sourceScriptId": { "type": "string" },
+    "hostNotes": { "type": "string" }
+  }
+}

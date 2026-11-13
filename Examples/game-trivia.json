@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "templateId": "tpl-trivia",
+  "name": "Trivia",
+  "description": "A question list. Use choices when you want multiple choice, or leave them out for a hidden short answer.",
+  "category": "Trivia",
+  "formats": ["QuestionAnswer", "MultipleChoice", "Points"],
+  "rules": "One round is one question. The correct answer stays hidden until the host reveals it.",
+  "scoringMethod": "Points",
+  "participationMethod": "Open",
+  "rounds": [
+    {
+      "roundId": "rnd-triv-1",
+      "title": "Sample question",
+      "prompt": "What color is the accent on the Midnight Neon theme?",
+      "choices": ["Gold", "Purple", "Mint"],
+      "correctAnswer": "Purple",
+      "explanation": "Swap this for questions about your own party."
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "scriptId": "scr-lib-welcome",
+  "title": "Welcome the room",
+  "category": "Welcome",
+  "stageDirections": "Wait for the chatter to dip. Speak a little slower than you think you need to.",
+  "spokenText": "Welcome in. Thank you for coming. I will walk us through the night, introduce the music, and keep the games moving. If you need anything, catch me between segments. Have a wonderful time.",
+  "announcement": "Welcome. The host will start the evening shortly.",
+  "hostNotes": "Copy this onto an event before you tailor the names. The library original stays as it is."
+}

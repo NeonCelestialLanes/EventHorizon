@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "templateId": "tpl-two-truths",
+  "name": "Two Truths and a Chirp",
+  "description": "Show three posts. Two are authentic. One was written for the game.",
+  "category": "Party",
+  "formats": ["MultipleChoice"],
+  "rules": "Put each post in choices. Set correctAnswer to the letter or the text of the invented post. Reveal it only when the room has guessed.",
+  "scoringMethod": "Manual",
+  "participationMethod": "Open",
+  "rounds": [
+    {
+      "roundId": "rnd-truth-1",
+      "title": "Three posts",
+      "prompt": "Which post was invented?",
+      "choices": [
+        "A. Spent the afternoon rearranging the same three chairs.",
+        "B. Won a tournament before breakfast and retired undefeated.",
+        "C. Named a minion after a soup."
+      ],
+      "correctAnswer": "B",
+      "explanation": "Replace these with posts your guests will recognize.",
+      "extras": {
+        "fabricated": "B"
+      }
+    }
+  ]
+}

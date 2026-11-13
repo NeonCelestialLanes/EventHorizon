@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "templateId": "tpl-send-or-delete",
+  "name": "Send or Delete",
+  "description": "A social guessing game. Each round is a fictional post. The room decides whether the featured person would publish it.",
+  "category": "Party",
+  "formats": ["MultipleChoice", "Elimination"],
+  "rules": "Two choices: SEND or DELETE. Read the chirp, take guesses, then reveal the answer. Elimination is optional. Turn it off in the formats list if you only want points.",
+  "introScript": "I will read a post. You tell me whether they would send it or delete it.",
+  "closingScript": "That is the last chirp. I will name the winner after I check the scores.",
+  "defaultPrize": "A small purse of gil",
+  "scoringMethod": "Elimination or points",
+  "participationMethod": "Open",
+  "hostNotes": "The chirp lives in extras.chirp so a new game can use a different label without a plugin update.",
+  "rounds": [
+    {
+      "roundId": "rnd-send-1",
+      "title": "Style",
+      "prompt": "Would they publish this?",
+      "featuredStaff": "Guest",
+      "choices": ["SEND", "DELETE"],
+      "correctAnswer": "SEND",
+      "extras": {
+        "chirp": "I don't have a gil problem. I have a very expensive sense of personal style."
+      }
+    },
+    {
+      "roundId": "rnd-send-2",
+      "title": "Morning",
+      "prompt": "Would they publish this?",
+      "featuredStaff": "Guest",
+      "choices": ["SEND", "DELETE"],
+      "correctAnswer": "DELETE",
+      "explanation": "Replace the answer and the staff name when you copy this into an event.",
+      "extras": {
+        "chirp": "I woke up early, watered every plant, and then went back to bed."
+      }
+    }
+  ]
+}
