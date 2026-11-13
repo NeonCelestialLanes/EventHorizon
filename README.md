@@ -1,6 +1,6 @@
 # Event Horizon
 
-Event Horizon is a private Dalamud plugin for planning an FFXIV event and hosting it live. Parties, games, scripts, and prizes live in JSON files. A new event or a new party game does not need a new build when it fits the schema.
+Event Horizon is a Dalamud plugin for planning an FFXIV event and hosting it live. Parties, games, scripts, and prizes live in JSON files. A new event or a new party game does not need a new build when it fits the schema.
 
 The plugin does not post chat, open links, trade, or play the game for you. Scores, reveals, and schedule progress are manual.
 
