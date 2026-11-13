@@ -26,7 +26,7 @@ internal static class RoundCue
             lines.Add(label.Length == 1 ? label + ": " + body : body);
         }
 
-        return string.Join("\n\n", lines);
+        return Chat(lines);
     }
 
     public static string Fill(string spoken, GameRound round)
@@ -49,8 +49,11 @@ internal static class RoundCue
                 keep.Add(paragraph.Trim());
         }
 
-        return string.Join("\n\n", keep);
+        return Chat(keep);
     }
+
+    private static string Chat(IReadOnlyList<string> parts) =>
+        string.Join(" ", parts).Replace('\n', ' ').Replace('\r', ' ');
 
     private static string Letter(string choice)
     {

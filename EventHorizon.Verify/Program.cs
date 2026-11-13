@@ -97,7 +97,7 @@ Check("uno registration", () =>
     };
     var cueRound = new GameRound { Choices = ["A: Red glamour.", "B: Named a minion.", "C: Three chairs."] };
     var cue = RoundCue.Paste([cueScript], cueRound);
-    Require(cue.Contains("A: Red glamour.") && cue.Contains("B: Named a minion.") && cue.Contains("let's hear our three Chirps") && !cue.Contains("[ANSWER]") && !cue.Contains("[READ CHIRP"), cue);
+    Require(cue == "All right, let's hear our three Chirps! A: Red glamour. B: Named a minion. C: Three chairs. So, which one?" && !cue.Contains("[ANSWER]") && !cue.Contains("[READ CHIRP"), cue);
     var tags = new[] { "Velvet", "Lantern", "Harbor" };
     Require(CollectTell.SameWords(tags, "harbor VELVET lantern") && CollectTell.SameWords(tags, "velvet, lantern, harbor."), "collect tell");
     Require(!CollectTell.SameWords(tags, "velvet lantern") && !CollectTell.SameWords(tags, "velvet lantern harbor extra"), "incomplete collect tell");
