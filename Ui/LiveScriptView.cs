@@ -48,7 +48,9 @@ internal static class LiveScriptView
         var spoken = ScriptSpeech.SpokenScript(paragraphs);
         Chrome.Section("Full Discord voice script");
         var height = Math.Max(220f, ImGui.GetContentRegionAvail().Y * 0.34f);
-        ImGui.InputTextMultiline("##eh-spoken", ref spoken, spoken.Length + 1, new System.Numerics.Vector2(-1, height), ImGuiInputTextFlags.ReadOnly);
+        if (ImGui.BeginChild("##eh-spoken", new System.Numerics.Vector2(-1, height), true))
+            ImGui.TextWrapped(spoken);
+        ImGui.EndChild();
 
         if (Chrome.Accent("Copy next"))
             Copy(app, ev, state, scriptId!, paragraphs, current, advance: true);
