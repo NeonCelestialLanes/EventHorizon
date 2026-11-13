@@ -249,7 +249,7 @@ internal static class Chrome
         return luminance > 0.62f ? new Vector4(0.08f, 0.07f, 0.12f, 1f) : new Vector4(0.97f, 0.97f, 0.99f, 1f);
     }
 
-    private static void DrawPill(Vector2 min, Vector2 max, Vector4 face)
+    internal static void DrawPill(Vector2 min, Vector2 max, Vector4 face)
     {
         var draw = ImGui.GetWindowDrawList();
         var radius = Math.Max(8f, (max.Y - min.Y) * 0.5f);

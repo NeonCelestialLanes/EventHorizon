@@ -2,6 +2,7 @@ using EventHorizon;
 using EventHorizon.Hosting;
 using EventHorizon.Models;
 using EventHorizon.Persistence;
+using EventHorizon.Ui;
 
 var failed = 0;
 var root = FindRepo();
@@ -15,6 +16,15 @@ Check("sample event", () =>
     Require(ev.EventId == "evt-starlight", "event id");
     Require(ev.Games.Count == 4, "games");
     Require(ev.Schedule.Count == 8, "schedule");
+});
+
+Check("whats new", () =>
+{
+    Require(ReleaseNotes.Releases.Length > 0, "notes");
+    Require(ReleaseNotes.Releases[0].Sections.Length > 0, "sections");
+    var manifest = File.ReadAllText(Path.Combine(root, "EventHorizon.json"));
+    var marker = "\"AssemblyVersion\": \"" + ReleaseNotes.Releases[0].Version + ".";
+    Require(manifest.Contains(marker, StringComparison.Ordinal), "manifest version");
 });
 
 Check("party template", () =>

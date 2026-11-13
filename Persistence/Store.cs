@@ -40,6 +40,8 @@ internal sealed class HorizonConfig
 
     public bool SeededSamples { get; set; }
 
+    public string SeenVersion { get; set; } = string.Empty;
+
     public string Section { get; set; } = "Dashboard";
 
     public string WorkspaceTab { get; set; } = "Overview";

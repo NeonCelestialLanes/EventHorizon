@@ -2,7 +2,7 @@
   <PropertyGroup>
     <AssemblyName>EventHorizon</AssemblyName>
     <Product>Event Horizon</Product>
-    <Version>1.0.0.0</Version>
+    <Version>1.0.1.0</Version>
     <Description>Plan a party, then host it live. Events, games, and scripts are JSON files, so a new party does not require a new build.</Description>
     <Authors>Event Horizon</Authors>
     <Author>Event Horizon</Author>
@@ -12,6 +12,8 @@
     <ApplicableVersion>any</ApplicableVersion>
     <Tags>events,roleplay,hosting</Tags>
     <AcceptsFeedback>false</AcceptsFeedback>
+    <RepoUrl>https://github.com/NeonCelestialLanes/EventHorizon</RepoUrl>
+    <IconUrl>https://raw.githubusercontent.com/NeonCelestialLanes/EventHorizon/main/images/icon.png</IconUrl>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
@@ -30,6 +32,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="schemas\**\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="images\icon.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

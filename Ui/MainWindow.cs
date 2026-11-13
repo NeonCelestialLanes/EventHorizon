@@ -8,7 +8,7 @@ using EventHorizon.Theme;
 
 namespace EventHorizon.Ui;
 
-internal sealed class MainWindow : Window
+internal sealed partial class MainWindow : Window
 {
     private readonly HorizonApp app;
 
@@ -30,6 +30,7 @@ internal sealed class MainWindow : Window
     public override void Draw()
     {
         ImGui.SetWindowFontScale(this.app.Store.Config.UiScale);
+        this.ConsiderWhatsNew();
         DueBanner.Draw(this.app);
         this.Header();
         var sidebar = this.app.Store.Config.CompactMode ? 188f : 210f;
@@ -86,6 +87,7 @@ internal sealed class MainWindow : Window
         this.StatusLine();
         ImGui.EndChild();
         this.Popups();
+        this.DrawWhatsNew();
         ImGui.SetWindowFontScale(1f);
     }
 

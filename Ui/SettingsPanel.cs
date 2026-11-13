@@ -124,6 +124,10 @@ internal static class SettingsPanel
 
         SyncPanel.Draw(app);
         Chrome.Section("About");
+        Chrome.Muted("Event Horizon " + ReleaseNotes.CurrentVersion());
+        if (Chrome.Button("What's new"))
+            window.ShowNews();
+        ImGui.Spacing();
         Chrome.Muted("Event Horizon keeps events, games, and scripts in JSON. A new party game does not need a new plugin build when it fits the schema. Chat is never posted for you, and links are never opened.");
     }
 }
