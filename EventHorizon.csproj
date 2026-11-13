@@ -3,7 +3,7 @@
     <AssemblyName>EventHorizon</AssemblyName>
     <Product>Event Horizon</Product>
     <Version>1.0.0.0</Version>
-    <Description>Plan events and host them live. Events, games, and scripts are JSON, so new parties do not require a new build.</Description>
+    <Description>Plan a party, then host it live. Events, games, and scripts are JSON files, so a new party does not require a new build.</Description>
     <Authors>Event Horizon</Authors>
     <Author>Event Horizon</Author>
     <Name>Event Horizon</Name>

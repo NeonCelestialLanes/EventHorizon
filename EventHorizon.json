@@ -2,7 +2,7 @@
   "Author": "Event Horizon",
   "Name": "Event Horizon",
   "Punchline": "Plan a party, then host it live.",
-  "Description": "A private event planner and live host desk. Events, games, and scripts are JSON files, so a new party does not require a new build.",
+  "Description": "Plan a party, then host it live. Events, games, and scripts are JSON files, so a new party does not require a new build.",
   "InternalName": "EventHorizon",
   "AssemblyVersion": "1.0.0.0",
   "ApplicableVersion": "any",

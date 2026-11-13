@@ -26,7 +26,35 @@ Check the sample files and the host logic without the game:
 dotnet run --project EventHorizon.Verify -c Debug
 ```
 
-## Install
+## Install from Dalamud
+
+This is a custom plugin repo. Add it once under Dalamud **Experimental**, then install **Event Horizon** from `/xlplugins` like any other plugin.
+
+1. In game, type `/xlsettings` (or open **Dalamud Settings** from the plugin installer).
+2. Open the **Experimental** tab.
+3. Skip **DevPlugins**. Go to **Custom Plugin Repositories**.
+4. Paste this URL into the empty box at the bottom:
+
+```
+https://raw.githubusercontent.com/NeonCelestialLanes/EventHorizon/main/pluginmaster.json
+```
+
+5. Click **+**, leave the new row checked, then click the **Save** icon (bottom right).
+6. Type `/xlplugins`, find **Event Horizon**, and install it.
+7. Type `/eh` to open it.
+
+## Make your own party
+
+Start from [`Examples/party.json`](Examples/party.json). It is a short party with a venue, a welcome, one game, a closing, and `/yell` lines you can copy in game.
+
+1. Copy that file and give the copy a new name.
+2. Change `eventId` to a new id, then change the name, date, times, venue, and spoken lines.
+3. In the plugin, use **Import event** and pick your file.
+4. Open it from the dashboard.
+
+[`Examples/event-starlight.json`](Examples/event-starlight.json) is a longer sample night, with DJs, several games, a contest, and prizes. Copy pieces from it when you need them. A full field list is in `EVENT_JSON_SCHEMA.md`.
+
+## Install a local build
 
 1. Build the project in Debug, as above.
 2. Point Dalamud's dev plugin path at `bin\Debug\EventHorizon.dll`, or copy `EventHorizon.dll` and `EventHorizon.json` into `%AppData%\XIVLauncher\devPlugins\EventHorizon\`.

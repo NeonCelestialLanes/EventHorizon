@@ -17,6 +17,15 @@ Check("sample event", () =>
     Require(ev.Schedule.Count == 8, "schedule");
 });
 
+Check("party template", () =>
+{
+    var ev = Read<EventDocument>(Path.Combine(examples, "party.json"));
+    var report = Validation.Event(ev, true);
+    Require(report.Ok, string.Join(" ", report.Errors));
+    Require(ev.EventId == "evt-my-party", "event id");
+    Require(ChatLines.Yells(ev.Scripts[0].Announcement).Count == 2, "welcome yells");
+});
+
 foreach (var file in Directory.GetFiles(examples, "game-*.json"))
 {
     Check(Path.GetFileName(file), () =>

@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "eventId": "evt-my-party",
+  "eventName": "My Party",
+  "description": "Starter party. Copy this file and replace the names, date, venue, and words with your own. Then import it in Event Horizon.",
+  "date": "2026-12-05",
+  "timezone": "America/New_York",
+  "startTime": "20:00",
+  "endTime": "22:00",
+  "status": "Planned",
+  "venue": {
+    "name": "Your venue",
+    "dataCenter": "Aether",
+    "world": "YourWorld",
+    "district": "Mist",
+    "ward": "1",
+    "plot": "1",
+    "notes": "Replace the world, district, ward, and plot. Delete ward and plot if this party is not in a house."
+  },
+  "organizer": "Your name",
+  "staff": [
+    { "staffId": "stf-host", "name": "Your name", "role": "Host" },
+    { "staffId": "stf-guest", "name": "Featured guest", "role": "Featured guest" }
+  ],
+  "schedule": [
+    {
+      "activityId": "act-welcome",
+      "startTime": "20:00",
+      "endTime": "20:15",
+      "title": "Welcome",
+      "category": "Welcome",
+      "scriptId": "scr-welcome",
+      "hostNotes": "Wait until the room has settled."
+    },
+    {
+      "activityId": "act-game",
+      "startTime": "20:15",
+      "endTime": "21:15",
+      "title": "Party game",
+      "category": "Game",
+      "gameInstanceId": "gme-party",
+      "scriptId": "scr-game",
+      "prizeId": "prz-game"
+    },
+    {
+      "activityId": "act-close",
+      "startTime": "21:15",
+      "endTime": "22:00",
+      "title": "Closing",
+      "category": "Closing",
+      "scriptId": "scr-close"
+    }
+  ],
+  "games": [
+    {
+      "instanceId": "gme-party",
+      "name": "Send or Delete",
+      "description": "The room guesses whether the guest would publish the line.",
+      "category": "Party",
+      "formats": ["MultipleChoice", "Points"],
+      "rules": "Read the line. The room guesses SEND or DELETE. Reveal the answer yourself and award points by hand.",
+      "scoringMethod": "Points",
+      "participationMethod": "Open",
+      "prizeId": "prz-game",
+      "rounds": [
+        {
+          "roundId": "rnd-1",
+          "title": "Round 1",
+          "prompt": "Would they publish this?",
+          "featuredStaff": "Featured guest",
+          "choices": ["SEND", "DELETE"],
+          "correctAnswer": "SEND",
+          "explanation": "Replace this with the real answer before the party.",
+          "extras": {
+            "chirp": "Replace this with the line you will read aloud."
+          }
+        }
+      ]
+    }
+  ],
+  "scripts": [
+    {
+      "scriptId": "scr-welcome",
+      "title": "Welcome",
+      "category": "Welcome",
+      "stageDirections": "Let the room quiet down before you start.",
+      "spokenText": "Welcome to My Party. I am your host. We have one game, then I will close the night. Say hello to someone new, and I will start when the room is ready.",
+      "announcement": "/yell Welcome to My Party. The doors are open.\n/yell The game starts at 8:15. Grab a seat."
+    },
+    {
+      "scriptId": "scr-game",
+      "title": "Game intro",
+      "category": "GameIntroduction",
+      "spokenText": "This game is called Send or Delete. I will read a line. You decide whether our guest would publish it. Shout SEND or DELETE, and I will reveal the answer after you guess.",
+      "announcement": "/yell Send or Delete is starting. Guess SEND or DELETE."
+    },
+    {
+      "scriptId": "scr-close",
+      "title": "Closing",
+      "category": "Closing",
+      "spokenText": "That is our night. Thank you for playing, and thank you for being kind on the way out. Good night.",
+      "announcement": "/yell Thank you for coming to My Party. Good night."
+    }
+  ],
+  "prizes": [
+    {
+      "prizeId": "prz-game",
+      "gameInstanceId": "gme-party",
+      "rewardType": "Gil",
+      "rewardName": "Game prize",
+      "amount": 10000,
+      "notes": "Hand this over yourself. The plugin does not trade."
+    }
+  ],
+  "notes": [
+    {
+      "noteId": "nte-plan",
+      "title": "Before the party",
+      "category": "Planning",
+      "body": "Change the date, the venue, the names, and the script. Import the file, then open it from the dashboard."
+    }
+  ],
+  "checklists": [
+    { "itemId": "chk-prize", "text": "Set the prize where you can reach it", "done": false },
+    { "itemId": "chk-names", "text": "Confirm the names you will say out loud", "done": false }
+  ]
+}
