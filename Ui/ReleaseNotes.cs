@@ -22,6 +22,28 @@ internal static class ReleaseNotes
     [
         new ReleaseNote
         {
+            Version = "1.0.4",
+            Title = "Open a game in its own window.",
+            Sections =
+            [
+                new ReleaseSection
+                {
+                    Heading = "New",
+                    Lines =
+                    [
+                        "Open game opens that game in its own window.",
+                        "Send or Delete and Two Truths and a Chirp can open registration. The tell word ignores capitalization.",
+                        "Trivia can copy the question. Announce the point yells who earned it.",
+                        "In Two Truths, click A, B, or C to copy that chirp. Copy cue pastes the round as one chat line.",
+                        "Mark a player eliminated. The last one still standing stays at the top.",
+                        "A Collect the Tags tell matches when it has every clue word, in any order.",
+                        "The Discord voice script wraps inside the box.",
+                    ],
+                },
+            ],
+        },
+        new ReleaseNote
+        {
             Version = "1.0.3",
             Title = "The logo sits above Settings.",
             Sections =
