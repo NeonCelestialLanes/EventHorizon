@@ -74,6 +74,202 @@ Check("uno bracket", () =>
     Require(progress.Winners.Count == 1 && progress.Winners[0] == first.Players[0], "final names the winner");
 });
 
+Check("uno registration", () =>
+{
+    Require(UnoTournament.IsSignup("Uno") && UnoTournament.IsSignup(" uno ") && UnoTournament.IsSignup("UNO"), "capitalization");
+    Require(!UnoTournament.IsSignup("uno please") && !UnoTournament.IsSignup("hello"), "unrelated tells");
+    var triviaWord = new GameInstance { Name = "Hall trivia", Category = "Trivia", TellWord = "trivia" };
+    Require(TellSignup.Matches(triviaWord, " Trivia ") && !TellSignup.Matches(triviaWord, "trivia please"), "trivia tell");
+    triviaWord.TellWord = "triva";
+    Require(TellSignup.Matches(triviaWord, "TRIVA") && !TellSignup.Matches(triviaWord, "trivia"), "custom tell word");
+    var unoWord = new GameInstance { Name = "Uno table", Category = "Tabletop", Formats = [GameFormat.Tournament], Tournament = new TournamentBoard() };
+    Require(TellSignup.Word(unoWord) == "uno", "blank uno word");
+    unoWord.TellWord = "cards";
+    Require(TellSignup.Matches(unoWord, "cards") && !TellSignup.Matches(unoWord, "uno"), "replaced uno word");
+    Require(UnoTournament.WorldAfter("Nova", "Nova Sephirot") == "Sephirot", "world");
+
+    var progress = new GameProgress();
+    Require(UnoTournament.TryRegister(progress, "Nova", "Sephirot", fromTell: true, bracketExists: false) == UnoSignup.Closed, "closed");
+    progress.RegistrationOpen = true;
+    Require(UnoTournament.TryRegister(progress, "Nova", "Sephirot", fromTell: true, bracketExists: false) == UnoSignup.Added, "first tell");
+    Require(UnoTournament.TryRegister(progress, "nova", "sephirot", fromTell: true, bracketExists: false) == UnoSignup.Duplicate, "duplicate");
+    Require(UnoTournament.TryRegister(progress, "Nova", "Zalera", fromTell: true, bracketExists: false) == UnoSignup.Added, "same name, other world");
+    Require(progress.Players.Count == 2, "two players");
+
+    var json = System.Text.Json.JsonSerializer.Serialize(progress, JsonIo.Options);
+    var loaded = System.Text.Json.JsonSerializer.Deserialize<GameProgress>(json, JsonIo.Options);
+    Require(loaded is { RegistrationOpen: true } && loaded.Players[0].World == "Sephirot", "reload keeps the roster");
+    var older = System.Text.Json.JsonSerializer.Deserialize<GameProgress>("{\"players\":[{\"playerId\":\"ply-1\",\"name\":\"Rio\"}]}", JsonIo.Options);
+    Require(older is { RegistrationOpen: false, Players.Count: 1 }, "older progress");
+    var party = Read<EventDocument>(Path.Combine(examples, "party.json"));
+    Require(Validation.Event(party, true).Ok, "older event file");
+
+    var game = new GameInstance
+    {
+        InstanceId = "gme-uno",
+        Name = "Uno table",
+        Formats = [GameFormat.Tournament],
+        Tournament = new TournamentBoard(),
+    };
+    var bracket = new GameProgress();
+    foreach (var name in new[] { "Ana", "Bea", "Cal", "Dee", "Eve" })
+        HostController.AddPlayer(bracket, name);
+    var built = HostController.BuildDuelBracket(game, bracket, new Random(1));
+    Require(built is null, built ?? "bracket");
+    Require(!bracket.RegistrationOpen, "generating closes registration");
+    var board = game.Tournament!;
+    Require(board.Matches.Count(match => match.Round == 1) == 4, "first round");
+    Require(board.Matches.Count(match => match.Notes == "Bye") == 3, "byes");
+    Require(board.Matches.Where(match => match.Notes == "Bye").All(match => HostController.WinnerOf(bracket, match) == match.Players[0]), "bye advances");
+    var final = board.Matches.Single(match => match.Round == board.Matches.Max(item => item.Round));
+    Require(final.Round == 3, "final");
+
+    var playing = board.Matches.Single(match => match.Round == 1 && match.Notes != "Bye");
+    var winner = playing.Players[0];
+    var other = playing.Players[1];
+    HostController.RecordWinner(bracket, board, playing, winner);
+    var next = board.Matches.Single(match => match.MatchId == playing.NextMatchId);
+    Require(HostController.SeatName(board, next, playing.NextSeat!.Value, bracket) == winner, "advance");
+    HostController.RecordWinner(bracket, board, playing, null);
+    Require(HostController.SeatName(board, next, playing.NextSeat.Value, bracket) is null, "undo");
+    HostController.RecordWinner(bracket, board, playing, other);
+    Require(HostController.SeatName(board, next, playing.NextSeat.Value, bracket) == other, "correction");
+
+    var ev = new EventDocument
+    {
+        EventId = "evt-uno",
+        Games = [game],
+        Prizes =
+        [
+            new PrizeEntry
+            {
+                PrizeId = "prz-uno",
+                GameInstanceId = game.InstanceId,
+                RewardType = RewardType.AetherCoins,
+                Amount = 2000,
+            },
+        ],
+    };
+    bracket.Winners.Clear();
+    bracket.Winners.Add(other);
+    var state = new LiveEventState { EventId = ev.EventId };
+    UnoTournament.LinkChampion(ev, game, bracket, state);
+    Require(state.Prizes["prz-uno"].Status == AwardStatus.Pending && state.Prizes["prz-uno"].Winners[0] == other, "prize is pending");
+    var line = UnoTournament.Announcement(other, UnoTournament.PrizeLabel(ev, game));
+    Require(line.StartsWith("/yell ", StringComparison.Ordinal) && line.Contains(other, StringComparison.Ordinal) && line.Contains("2,000 Aether Coins", StringComparison.Ordinal), line);
+});
+
+Check("trivia scores", () =>
+{
+    var game = new GameInstance
+    {
+        InstanceId = "gme-trivia",
+        Name = "Hall trivia",
+        Category = "Trivia",
+        Formats = [GameFormat.QuestionAnswer],
+        Rounds =
+        [
+            new GameRound { RoundId = "q1", Prompt = "One", CorrectAnswer = "A" },
+            new GameRound { RoundId = "q2", Prompt = "Two", CorrectAnswer = "B" },
+            new GameRound { RoundId = "q3", Prompt = "Three", CorrectAnswer = "C" },
+        ],
+    };
+    var progress = new GameProgress();
+    var nova = TriviaScore.Ensure(progress, "Nova", "Sephirot");
+    var otherNova = TriviaScore.Ensure(progress, "Nova", "Zalera");
+    Require(nova.PlayerId != otherNova.PlayerId, "same name, different world");
+    Require(TriviaScore.Ensure(progress, "nova", "sephirot").PlayerId == nova.PlayerId, "duplicate player");
+    Require(TriviaScore.Award(progress, "q1", nova.PlayerId) is null, "first point");
+    Require(TriviaScore.Award(progress, "q1", otherNova.PlayerId) is not null, "second answer gets no point");
+    Require(TriviaScore.Award(progress, "q2", nova.PlayerId) is null, "another question");
+    Require(TriviaScore.Points(progress.Trivia, nova.PlayerId) == 2, "two points");
+    Require(TriviaScore.Skip(progress, "q3") is null, "skip");
+    Require(TriviaScore.Points(progress.Trivia, nova.PlayerId) == 2, "skip adds nothing");
+    Require(TriviaScore.Restore(progress, "q3") is null, "restore");
+    Require(TriviaScore.Award(progress, "q3", otherNova.PlayerId) is null, "restored question");
+    var rows = TriviaScore.Board(progress);
+    Require(rows.Single(row => row.PlayerId == nova.PlayerId).Rank == 1, "leader");
+    Require(rows.Single(row => row.PlayerId == otherNova.PlayerId).Rank == 2, "second");
+
+    Require(TriviaScore.Reassign(progress, "q3", nova.PlayerId) is null, "reassign");
+    Require(TriviaScore.Points(progress.Trivia, otherNova.PlayerId) == 0, "old player lost the point");
+    Require(TriviaScore.Undo(progress) is null, "undo reassign");
+    Require(TriviaScore.Points(progress.Trivia, otherNova.PlayerId) == 1, "point restored");
+
+    var tied = TriviaScore.Ensure(progress, "Bea", "Sephirot");
+    Require(TriviaScore.Award(progress, "q2", tied.PlayerId) is not null, "q2 already scored");
+    progress.Trivia!.Results.RemoveAll(result => result.QuestionId == "q2");
+    Require(TriviaScore.Award(progress, "q2", tied.PlayerId) is null, "bea scores q2");
+    var tiedRows = TriviaScore.Board(progress);
+    var novaRank = tiedRows.Single(row => row.PlayerId == nova.PlayerId).Rank;
+    var beaRank = tiedRows.Single(row => row.PlayerId == tied.PlayerId).Rank;
+    Require(novaRank == beaRank, "equal scores share a rank");
+
+    var ev = new EventDocument
+    {
+        EventId = "evt-trivia",
+        Games = [game],
+        Prizes = [new PrizeEntry { PrizeId = "prz-trivia", GameInstanceId = game.InstanceId, RewardType = RewardType.AetherCoins, Amount = 1250 }],
+    };
+    var state = new LiveEventState { EventId = ev.EventId };
+    Require(TriviaScore.Finish(ev, game, progress, state) is not null, "tie needs a tiebreaker");
+    TriviaScore.AddTiebreak(game, progress, "One more", "Yes");
+    var extra = TriviaScore.Current(game, progress);
+    if (extra is not { Extra: true } tiebreak)
+        throw new InvalidOperationException("tiebreaker is current");
+    Require(TriviaScore.Award(progress, tiebreak.Id, nova.PlayerId) is null, "tiebreaker point");
+    Require(TriviaScore.Finish(ev, game, progress, state) is null, "single winner");
+    Require(state.Prizes["prz-trivia"].Status == AwardStatus.Pending, "prize pending");
+    Require(progress.Winners[0] == "Nova (Sephirot)", progress.Winners[0]);
+    var champion = TriviaScore.ChampionYell(progress.Winners[0], TriviaScore.Points(progress.Trivia, nova.PlayerId), TriviaScore.PrizeLabel(ev, game));
+    Require(champion.StartsWith("/yell And we have our trivia champion!", StringComparison.Ordinal), champion);
+    Require(champion.Contains("Nova (Sephirot)", StringComparison.Ordinal) && champion.Contains("1,250 Aether Coins", StringComparison.Ordinal), champion);
+
+    var top = TriviaScore.TopThree(TriviaScore.Board(progress), 4, 0);
+    Require(top.Count > 0 && top[0].StartsWith("/yell ", StringComparison.Ordinal), "top three yell");
+    Require(top.All(line => line.Contains("Nova (Sephirot)", StringComparison.Ordinal) || top.Any(item => item.Contains("Nova (Sephirot)", StringComparison.Ordinal))), "names kept");
+    var many = new GameProgress();
+    for (var index = 0; index < 30; index++)
+    {
+        var player = TriviaScore.Ensure(many, "Player Name Number " + index.ToString("00"), "Sephirot");
+        if (index % 2 == 0)
+            TriviaScore.Adjust(many, player.PlayerId, index);
+    }
+
+    var packed = TriviaScore.AllScores(TriviaScore.Board(many));
+    Require(packed.Count > 1, "long board splits");
+    Require(packed.All(line => line.StartsWith("/yell ", StringComparison.Ordinal)), "each part is a yell");
+    Require(packed.All(line => line.Length <= TriviaScore.YellLimit), "each yell fits");
+    var combined = string.Join("\n", packed);
+    Require(combined.Contains("Player Name Number 00", StringComparison.Ordinal) && combined.Contains("Player Name Number 29", StringComparison.Ordinal), "no name dropped");
+
+    var json = System.Text.Json.JsonSerializer.Serialize(progress, JsonIo.Options);
+    var loaded = System.Text.Json.JsonSerializer.Deserialize<GameProgress>(json, JsonIo.Options);
+    Require(loaded?.Trivia is { Ended: true } && TriviaScore.Points(loaded.Trivia, nova.PlayerId) == TriviaScore.Points(progress.Trivia, nova.PlayerId), "reload keeps scores");
+    var older = System.Text.Json.JsonSerializer.Deserialize<GameProgress>("{}", JsonIo.Options);
+    Require(older?.Trivia is null, "older progress");
+    var party = Read<EventDocument>(Path.Combine(examples, "party.json"));
+    Require(Validation.Event(party, true).Ok, "older event");
+    TriviaScore.Move(game, progress, -1);
+    TriviaScore.Move(game, progress, 1);
+    Require(TriviaScore.Current(game, progress) is not null, "navigation");
+
+    var start = new DateTimeOffset(2026, 11, 13, 18, 0, 0, TimeSpan.Zero);
+    var timed = new GameProgress();
+    Require(TriviaScore.Arm(timed, "q1", start, false), "timer starts");
+    Require(!TriviaScore.Arm(timed, "q1", start.AddSeconds(10), false), "timer keeps running");
+    var running = TriviaScore.ReadClock(timed, "q1", start.AddSeconds(10));
+    Require(running.Label == "0:50" && !running.Final && !running.Done, running.Label);
+    var ending = TriviaScore.ReadClock(timed, "q1", start.AddSeconds(55));
+    Require(ending.Final && ending.Label == "5", ending.Label);
+    var lastSecond = TriviaScore.ReadClock(timed, "q1", start.AddSeconds(59.1));
+    Require(lastSecond.Final && lastSecond.Label == "1", lastSecond.Label);
+    var finished = TriviaScore.ReadClock(timed, "q1", start.AddSeconds(60));
+    Require(finished.Done && finished.Label == "Time", finished.Label);
+    Require(TriviaScore.Arm(timed, "q2", start.AddMinutes(1), false), "next question");
+    Require(TriviaScore.ReadClock(timed, "q2", start.AddMinutes(1)).Label == "1:00", "fresh minute");
+});
+
 Check("due cue", () =>
 {
     var ev = new EventDocument
@@ -350,6 +546,7 @@ int StoreTests(string directory)
         HostController.Advance(party, partyState);
         store.MarkState(party.EventId);
         store.ResetParty(party.EventId);
+
         var fresh = store.StateFor(party.EventId);
         if (fresh.Hosting || fresh.CurrentActivityId is not null || fresh.Activities.Count > 0 || party.Schedule.Count != 8 || party.Status != EventStatus.Ready)
         {

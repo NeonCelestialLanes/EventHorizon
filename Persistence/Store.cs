@@ -529,6 +529,7 @@ internal sealed class HorizonStore
             ClosingScript = template.ClosingScript,
             ScoringMethod = template.ScoringMethod,
             ParticipationMethod = template.ParticipationMethod,
+            TellWord = template.TellWord,
             HostNotes = template.HostNotes,
             Rounds = JsonIo.Clone(template.Rounds),
             Tournament = template.Tournament is null ? null : JsonIo.Clone(template.Tournament),

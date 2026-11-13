@@ -21,6 +21,12 @@ internal static class GameBoard
         if (!string.IsNullOrWhiteSpace(game.Rules))
             Chrome.Muted(game.Rules);
 
+        if (TriviaScore.IsTrivia(game))
+        {
+            TriviaPanel.Draw(app, ev, game, progress);
+            return;
+        }
+
         var round = HostController.CurrentRound(game, progress);
         if (round is not null)
         {
@@ -42,6 +48,12 @@ internal static class GameBoard
             Chrome.Muted("This game has no rounds. Use it for instructions or manual scoring.");
         }
 
+        if (UnoTournament.IsUno(game))
+        {
+            UnoPanel.Draw(app, ev, game, progress);
+            return;
+        }
+
         if (game.Formats.Contains(GameFormat.Collection))
             Collection(app, ev, game, progress);
         if (game.Formats.Count == 0 || game.Formats.Contains(GameFormat.Points) || game.Formats.Contains(GameFormat.Elimination) || game.Formats.Contains(GameFormat.Custom) || game.Formats.Contains(GameFormat.Tournament) || game.Formats.Contains(GameFormat.QuestionAnswer))
@@ -57,6 +69,30 @@ internal static class GameBoard
     {
         var state = app.Store.StateFor(ev.EventId);
         var progress = HostController.PeekGame(state, game.InstanceId);
+        if (TriviaScore.IsTrivia(game))
+        {
+            var asked = TriviaScore.Current(game, progress);
+            var total = TriviaScore.Questions(game, progress.Trivia).Count;
+            ImGui.TextDisabled(total == 0 ? "No questions yet." : "Question " + ((progress.Trivia?.ViewIndex ?? 0) + 1) + " / " + total);
+            if (asked is { } question)
+            {
+                TriviaPanel.Clock(app, ev, game, question.Id, Math.Max(1f, app.Store.Config.UiScale));
+                if (!string.IsNullOrWhiteSpace(question.Prompt))
+                    ImGui.TextWrapped(question.Prompt);
+                var answerHidden = !string.IsNullOrWhiteSpace(question.Answer) && !HostController.IsRevealed(progress, question.Id);
+                if (answerHidden && Chrome.Accent("Reveal"))
+                    Mutate(app, ev, game, edit => HostController.Reveal(edit, question.Id));
+                if (!answerHidden && !string.IsNullOrWhiteSpace(question.Answer))
+                    ImGui.TextColored(ThemeHolder.Mint, question.Answer);
+            }
+
+            var leaders = TriviaScore.Board(progress).Where(row => row.Rank == 1).ToList();
+            ImGui.TextColored(ThemeHolder.Gold, leaders.Count == 0 ? "No trivia leader yet." : "Leader: " + string.Join(", ", leaders.Select(row => row.Label + " " + row.Points)));
+            if (Chrome.Button("Next"))
+                Mutate(app, ev, game, edit => TriviaScore.Move(game, edit, 1));
+            return;
+        }
+
         var round = HostController.CurrentRound(game, progress);
         ImGui.TextDisabled("Round " + (game.Rounds.Count == 0 ? 0 : Math.Clamp(progress.RoundIndex, 0, game.Rounds.Count - 1) + 1) + " / " + game.Rounds.Count);
         if (round is null)
@@ -309,7 +345,7 @@ internal static class GameBoard
         DrawBracket(app, ev, game, board, progress);
     }
 
-    private static void DrawBracket(HorizonApp app, EventDocument ev, GameInstance game, TournamentBoard board, GameProgress progress)
+    internal static void DrawBracket(HorizonApp app, EventDocument ev, GameInstance game, TournamentBoard board, GameProgress progress)
     {
         const float cardWidth = 196f;
         const float rowHeight = 28f;
@@ -327,7 +363,7 @@ internal static class GameBoard
             var stack = top;
             foreach (var match in board.Matches.Where(match => match.Round == round))
             {
-                var rows = Math.Max(1, match.Players.Count);
+                var rows = SeatCount(board, match);
                 var card = header + (rows * rowHeight) + 8f;
                 var y = stack;
                 var feeders = board.Matches.Where(item => item.NextMatchId == match.MatchId).ToList();
@@ -369,7 +405,7 @@ internal static class GameBoard
             draw.AddRectFilled(min, max, ImGui.GetColorU32(ThemeService.With(ThemeHolder.Panel, 0.95f)), 8f);
             draw.AddRect(min, max, ImGui.GetColorU32(ThemeService.With(ThemeHolder.Accent, 0.55f)), 8f);
             var index = board.Matches.Where(item => item.Round == match.Round).ToList().IndexOf(match) + 1;
-            var label = (board.Seats > 2 ? "Table " : "Match ") + index;
+            var label = (board.Seats > 2 ? "Table " : "Match ") + index + "  ·  " + HostController.MatchPhase(board, match, progress);
             draw.AddText(min + new Vector2(10f, 6f), ImGui.GetColorU32(ThemeHolder.Accent), label);
 
             if (!string.IsNullOrWhiteSpace(match.NextMatchId) && pos.TryGetValue(match.NextMatchId, out var nextAt))
@@ -385,21 +421,24 @@ internal static class GameBoard
             }
 
             var winner = HostController.WinnerOf(progress, match);
-            for (var seat = 0; seat < Math.Max(1, match.Players.Count); seat++)
+            var seats = SeatCount(board, match);
+            for (var seat = 0; seat < seats; seat++)
             {
                 var row = min + new Vector2(8f, header + (seat * rowHeight));
                 var rowMax = new Vector2(max.X - 8f, row.Y + rowHeight - 4f);
                 var name = HostController.SeatName(board, match, seat, progress);
+                var bye = string.Equals(match.Notes, "Bye", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(name);
                 var won = !string.IsNullOrWhiteSpace(name) && string.Equals(name, winner, StringComparison.Ordinal);
+                var eliminated = !bye && !string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(winner) && !won;
                 if (won)
                     draw.AddRectFilled(row, rowMax, ImGui.GetColorU32(ThemeService.With(ThemeHolder.Mint, 0.22f)), 4f);
-                else if (!string.IsNullOrWhiteSpace(name) && ImGui.IsMouseHoveringRect(row, rowMax))
+                else if (!bye && !string.IsNullOrWhiteSpace(name) && ImGui.IsMouseHoveringRect(row, rowMax))
                     draw.AddRectFilled(row, rowMax, ImGui.GetColorU32(ThemeService.With(ThemeHolder.Accent, 0.16f)), 4f);
 
-                var text = string.IsNullOrWhiteSpace(name) ? HostController.SeatHint(board, match, seat) : name;
-                var color = string.IsNullOrWhiteSpace(name) ? ThemeHolder.Muted : won ? ThemeHolder.Mint : ThemeHolder.Text;
+                var text = bye ? "Bye" : string.IsNullOrWhiteSpace(name) ? HostController.SeatHint(board, match, seat) : name;
+                var color = bye || string.IsNullOrWhiteSpace(name) || eliminated ? ThemeHolder.Muted : won ? ThemeHolder.Mint : ThemeHolder.Text;
                 draw.AddText(row + new Vector2(6f, 4f), ImGui.GetColorU32(color), text);
-                if (string.IsNullOrWhiteSpace(name))
+                if (bye || string.IsNullOrWhiteSpace(name))
                     continue;
 
                 ImGui.SetCursorScreenPos(row);
@@ -407,11 +446,25 @@ internal static class GameBoard
                     continue;
 
                 var chosen = won ? null : name;
-                Mutate(app, ev, game, edit => HostController.RecordWinner(edit, board, match, chosen));
+                Mutate(app, ev, game, edit =>
+                {
+                    HostController.RecordWinner(edit, board, match, chosen);
+                    if (UnoTournament.IsUno(game))
+                        UnoTournament.LinkChampion(ev, game, edit, app.Store.StateFor(ev.EventId));
+                });
             }
         }
 
         ImGui.EndChild();
+    }
+
+    private static int SeatCount(TournamentBoard board, TournamentMatch match)
+    {
+        var feeders = board.Matches.Count(item => item.NextMatchId == match.MatchId);
+        var count = Math.Max(match.Players.Count, feeders);
+        if (string.Equals(match.Notes, "Bye", StringComparison.OrdinalIgnoreCase))
+            count = Math.Max(count, 2);
+        return Math.Max(1, count);
     }
 
     private static string RoundTitle(TournamentBoard board, int round, int last)

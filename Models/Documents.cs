@@ -254,6 +254,8 @@ public sealed class GameTemplate
 
     public string? ParticipationMethod { get; set; }
 
+    public string? TellWord { get; set; }
+
     public string? HostNotes { get; set; }
 
     public List<GameRound> Rounds { get; set; } = [];
@@ -267,6 +269,8 @@ public sealed class GameTemplate
         foreach (var round in this.Rounds)
             round.Normalize();
         this.Tournament?.Normalize();
+        var tell = (this.TellWord ?? "").Trim();
+        this.TellWord = tell.Length == 0 ? null : tell;
     }
 }
 
@@ -296,6 +300,8 @@ public sealed class GameInstance
 
     public string? ParticipationMethod { get; set; }
 
+    public string? TellWord { get; set; }
+
     public string? HostNotes { get; set; }
 
     public List<GameRound> Rounds { get; set; } = [];
@@ -309,6 +315,8 @@ public sealed class GameInstance
         foreach (var round in this.Rounds)
             round.Normalize();
         this.Tournament?.Normalize();
+        var tell = (this.TellWord ?? "").Trim();
+        this.TellWord = tell.Length == 0 ? null : tell;
     }
 }
 
@@ -596,6 +604,8 @@ public sealed class GameProgress
 {
     public int RoundIndex { get; set; }
 
+    public bool RegistrationOpen { get; set; }
+
     public List<string> RevealedRoundIds { get; set; } = [];
 
     public List<PlayerRecord> Players { get; set; } = [];
@@ -606,6 +616,8 @@ public sealed class GameProgress
 
     public Dictionary<string, string> MatchWinners { get; set; } = new(StringComparer.Ordinal);
 
+    public TriviaLive? Trivia { get; set; }
+
     public void Normalize()
     {
         this.RevealedRoundIds ??= [];
@@ -613,7 +625,103 @@ public sealed class GameProgress
         this.Winners ??= [];
         this.Votes ??= new(StringComparer.Ordinal);
         this.MatchWinners ??= new(StringComparer.Ordinal);
+        this.Trivia?.Normalize();
     }
+}
+
+public sealed class TriviaLive
+{
+    public bool Listening { get; set; }
+
+    public bool Ended { get; set; }
+
+    public int ViewIndex { get; set; }
+
+    public string? TimerQuestionId { get; set; }
+
+    public DateTimeOffset? TimerStarted { get; set; }
+
+    public List<TriviaResult> Results { get; set; } = [];
+
+    public List<TriviaAdjust> Adjustments { get; set; } = [];
+
+    public List<TriviaHeard> Heard { get; set; } = [];
+
+    public List<TriviaExtra> Extras { get; set; } = [];
+
+    public List<TriviaAction> Actions { get; set; } = [];
+
+    public void Normalize()
+    {
+        this.Results ??= [];
+        this.Adjustments ??= [];
+        this.Heard ??= [];
+        this.Extras ??= [];
+        this.Actions ??= [];
+        if (this.ViewIndex < 0)
+            this.ViewIndex = 0;
+    }
+}
+
+public sealed class TriviaResult
+{
+    public string QuestionId { get; set; } = "";
+
+    public string? PlayerId { get; set; }
+
+    public bool Skipped { get; set; }
+}
+
+public sealed class TriviaAdjust
+{
+    public string Id { get; set; } = "";
+
+    public string PlayerId { get; set; } = "";
+
+    public int Delta { get; set; }
+
+    public bool Undone { get; set; }
+}
+
+public sealed class TriviaHeard
+{
+    public int Order { get; set; }
+
+    public string Name { get; set; } = "";
+
+    public string? World { get; set; }
+
+    public string Message { get; set; } = "";
+
+    public string? QuestionId { get; set; }
+}
+
+public sealed class TriviaExtra
+{
+    public string QuestionId { get; set; } = "";
+
+    public string Prompt { get; set; } = "";
+
+    public string? Answer { get; set; }
+}
+
+public sealed class TriviaAction
+{
+    public string Op { get; set; } = "";
+
+    public string? QuestionId { get; set; }
+
+    public string? PlayerId { get; set; }
+
+    public string? PreviousPlayerId { get; set; }
+
+    public bool PreviousSkipped { get; set; }
+
+    public string? AdjustId { get; set; }
+
+    public int Delta { get; set; }
+
+    public bool Undone { get; set; }
 }
 
 public sealed class PlayerRecord
@@ -621,6 +729,8 @@ public sealed class PlayerRecord
     public string PlayerId { get; set; } = "";
 
     public string Name { get; set; } = "";
+
+    public string? World { get; set; }
 
     public int Score { get; set; }
 

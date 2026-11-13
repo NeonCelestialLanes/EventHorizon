@@ -17,13 +17,15 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ICommandManager commandManager;
     private readonly IChatGui chat;
     private readonly IPluginLog log;
+    private readonly UnoTells tells;
+    private readonly TriviaEars ears;
     private readonly HorizonApp app;
     private readonly WindowSystem windows = new("EventHorizon");
     private readonly MainWindow main;
     private readonly LiveHostWindow host;
     private readonly CompactHostWindow compact;
 
-    public Plugin(IDalamudPluginInterface pluginInterface, ICommandManager commandManager, IChatGui chat, IPluginLog log, ITextureProvider textures)
+    public Plugin(IDalamudPluginInterface pluginInterface, ICommandManager commandManager, IChatGui chat, IPluginLog log, ITextureProvider textures, IToastGui toast, IObjectTable players)
     {
         this.pluginInterface = pluginInterface;
         this.commandManager = commandManager;
@@ -35,7 +37,8 @@ public sealed class Plugin : IDalamudPlugin
         this.app.ScriptFace = new ScriptFace(pluginInterface);
         this.app.Travel = new VenueTeleport(pluginInterface);
         this.app.Sync = new PlannerSync(this.app.Store);
-
+        this.tells = new UnoTells(this.app, chat, toast);
+        this.ears = new TriviaEars(this.app, chat, players);
         this.main = new MainWindow(this.app, LoadLogo(directory, textures));
         this.host = new LiveHostWindow(this.app);
         this.compact = new CompactHostWindow(this.app);
@@ -68,6 +71,8 @@ public sealed class Plugin : IDalamudPlugin
             this.log.Error(ex, "Event Horizon could not save while closing.");
         }
 
+        this.tells.Dispose();
+        this.ears.Dispose();
         this.windows.RemoveAllWindows();
         this.app.Sync?.Dispose();
         this.app.ScriptFace?.Dispose();
@@ -134,6 +139,8 @@ public sealed class Plugin : IDalamudPlugin
     {
         try
         {
+            this.tells.Flush();
+            this.ears.Flush();
             this.app.Flush();
             this.app.Sync?.Pump();
         }

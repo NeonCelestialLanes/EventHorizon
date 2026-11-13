@@ -5,9 +5,11 @@
   "description": "A question list. Use choices when you want multiple choice, or leave them out for a hidden short answer.",
   "category": "Trivia",
   "formats": ["QuestionAnswer", "MultipleChoice", "Points"],
-  "rules": "One round is one question. The correct answer stays hidden until the host reveals it.",
+  "rules": "One round is one question. The host awards one point to the first correct answer. The plugin does not grade chat or post the scores.",
+  "defaultPrize": "1,250 Aether Coins",
   "scoringMethod": "Points",
   "participationMethod": "Open",
+  "tellWord": "trivia",
   "rounds": [
     {
       "roundId": "rnd-triv-1",

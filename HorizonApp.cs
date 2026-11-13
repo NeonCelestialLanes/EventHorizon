@@ -59,6 +59,22 @@ internal sealed class UiSession
 
     public string PlayerName { get; set; } = "";
 
+    public string UnoWorld { get; set; } = "";
+
+    public string TriviaName { get; set; } = "";
+
+    public string TriviaWorld { get; set; } = "";
+
+    public string TriviaSearch { get; set; } = "";
+
+    public string? TriviaPlayerId { get; set; }
+
+    public string TiePrompt { get; set; } = "";
+
+    public string TieAnswer { get; set; } = "";
+
+    public bool TriviaAllAnswers { get; set; }
+
     public string QuickNote { get; set; } = "";
 
     public string ExtraKey { get; set; } = "";

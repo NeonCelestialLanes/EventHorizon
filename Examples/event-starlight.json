@@ -185,9 +185,10 @@
       "name": "Hall trivia",
       "category": "Trivia",
       "formats": ["QuestionAnswer", "Points"],
-      "rules": "Read the prompt. Keep the answer hidden until you press Reveal. Scores are manual.",
+      "rules": "Listen for answers, then give one point to the first correct player. Copy a yell when you want the room to see the scores. Nothing is posted for you.",
       "scoringMethod": "Points",
       "participationMethod": "Open",
+      "tellWord": "trivia",
       "rounds": [
         {
           "roundId": "rnd-triv-1",
@@ -213,12 +214,13 @@
       "description": "Track the bracket. The card game happens at the table, not in the plugin.",
       "category": "Tabletop",
       "formats": ["Tournament"],
-      "rules": "Add the players, set how many sit at each table, and make the bracket. Click a name when that table finishes. Event Horizon does not deal cards or watch the table.",
+      "rules": "Open registration, then players send you a tell that says Uno. Generate the bracket when sign-ups are done. Click a name to record that match. Event Horizon does not deal cards, answer the tell, or hand out the prize.",
       "scoringMethod": "Single elimination",
       "participationMethod": "Sign up",
+      "tellWord": "uno",
       "tournament": {
         "format": "SingleElimination",
-        "seats": 4,
+        "seats": 2,
         "matches": []
       }
     }
@@ -272,7 +274,9 @@
   "prizes": [
     { "prizeId": "prz-send", "gameInstanceId": "gme-send", "rewardType": "Gil", "amount": 50000, "notes": "Hand the gil over yourself." },
     { "prizeId": "prz-truths", "gameInstanceId": "gme-truths", "rewardType": "Item", "rewardName": "A glow-star hairpin", "allowMultipleWinners": false },
-    { "prizeId": "prz-tags", "contestId": "cst-tags", "rewardType": "AetherCoins", "amount": 100, "allowMultipleWinners": true, "notes": "Split it if two people finish together." }
+    { "prizeId": "prz-tags", "contestId": "cst-tags", "rewardType": "AetherCoins", "amount": 100, "allowMultipleWinners": true, "notes": "Split it if two people finish together." },
+    { "prizeId": "prz-uno", "gameInstanceId": "gme-uno", "rewardType": "AetherCoins", "amount": 2000, "rewardName": "Uno champion", "notes": "Hand the coins over yourself. The plugin does not trade." },
+    { "prizeId": "prz-trivia", "gameInstanceId": "gme-trivia", "rewardType": "AetherCoins", "amount": 1250, "rewardName": "Trivia champion", "notes": "Hand the coins over yourself. The plugin does not trade." }
   ],
   "notes": [
     {

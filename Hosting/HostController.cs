@@ -291,6 +291,110 @@ internal static class HostController
         return null;
     }
 
+    public static string? BuildDuelBracket(GameInstance game, GameProgress progress, Random? random = null)
+    {
+        var labels = progress.Players
+            .Where(player => !string.IsNullOrWhiteSpace(player.Name))
+            .Select(player => UnoTournament.Label(player.Name, player.World))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (labels.Count < 2)
+            return "Add at least two players before making the bracket.";
+
+        var rng = random ?? Random.Shared;
+        for (var index = labels.Count - 1; index > 0; index--)
+        {
+            var swap = rng.Next(index + 1);
+            (labels[index], labels[swap]) = (labels[swap], labels[index]);
+        }
+
+        game.Tournament ??= new TournamentBoard();
+        var board = game.Tournament;
+        board.Format = "SingleElimination";
+        board.Seats = 2;
+        board.Matches.Clear();
+        progress.MatchWinners.Clear();
+        progress.Winners.Clear();
+        progress.RegistrationOpen = false;
+
+        var size = 1;
+        while (size < labels.Count)
+            size *= 2;
+
+        var byes = size - labels.Count;
+        var cursor = 0;
+        var round = new List<TournamentMatch>();
+        for (var bye = 0; bye < byes; bye++)
+        {
+            var match = NewMatch(board, 1, [labels[cursor]]);
+            match.Notes = "Bye";
+            cursor++;
+            round.Add(match);
+        }
+
+        while (cursor + 1 < labels.Count)
+        {
+            round.Add(NewMatch(board, 1, [labels[cursor], labels[cursor + 1]]));
+            cursor += 2;
+        }
+
+        if (cursor < labels.Count)
+        {
+            var leftover = NewMatch(board, 1, [labels[cursor]]);
+            leftover.Notes = "Bye";
+            round.Add(leftover);
+        }
+
+        var guard = 0;
+        while (round.Count > 1 && guard++ < 16)
+        {
+            var next = new List<TournamentMatch>();
+            var number = round[0].Round + 1;
+            for (var index = 0; index < round.Count; index += 2)
+            {
+                var created = NewMatch(board, number, []);
+                round[index].NextMatchId = created.MatchId;
+                round[index].NextSeat = 0;
+                if (index + 1 < round.Count)
+                {
+                    round[index + 1].NextMatchId = created.MatchId;
+                    round[index + 1].NextSeat = 1;
+                }
+
+                next.Add(created);
+            }
+
+            round = next;
+        }
+
+        foreach (var match in board.Matches)
+        {
+            if (!string.Equals(match.Notes, "Bye", StringComparison.Ordinal))
+                continue;
+
+            var winner = match.Players.FirstOrDefault(name => !string.IsNullOrWhiteSpace(name));
+            if (!string.IsNullOrWhiteSpace(winner))
+                SetMatchWinner(progress, match, winner);
+        }
+
+        return null;
+    }
+
+    public static string MatchPhase(TournamentBoard board, TournamentMatch match, GameProgress progress)
+    {
+        if (!string.IsNullOrWhiteSpace(WinnerOf(progress, match)))
+            return "Done";
+
+        var known = 0;
+        for (var seat = 0; seat < Math.Max(match.Players.Count, 2); seat++)
+        {
+            if (!string.IsNullOrWhiteSpace(SeatName(board, match, seat, progress)))
+                known++;
+        }
+
+        return known >= 2 ? "Playing" : "Waiting";
+    }
+
     public static string? SeatName(TournamentBoard board, TournamentMatch match, int seat, GameProgress progress)
     {
         if (seat < match.Players.Count && !string.IsNullOrWhiteSpace(match.Players[seat]))

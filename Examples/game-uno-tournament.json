@@ -5,13 +5,15 @@
   "description": "A bracket for a card game played at a real table.",
   "category": "Tabletop",
   "formats": ["Tournament"],
-  "rules": "Add the players, set how many sit at each table, and make the bracket. Click a name when that table finishes. The plugin does not deal cards or watch the table.",
+  "rules": "Open registration, then players send the host a tell that says Uno. Generate the bracket when sign-ups are done. Click a name to record that match. The plugin does not deal cards, answer the tell, or hand out the prize.",
+  "defaultPrize": "2,000 Aether Coins",
   "scoringMethod": "Single elimination",
   "participationMethod": "Sign up",
+  "tellWord": "uno",
   "hostNotes": "Other table games can use this same template. Change the name and the rules.",
   "tournament": {
     "format": "SingleElimination",
-    "seats": 4,
+    "seats": 2,
     "matches": []
   },
   "rounds": []

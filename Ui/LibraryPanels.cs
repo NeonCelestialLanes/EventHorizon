@@ -128,6 +128,7 @@ internal static class LibraryPanel
             app.Store.MarkGame(game.TemplateId);
         if (Chrome.Field("Participation", game.ParticipationMethod, value => game.ParticipationMethod = value))
             app.Store.MarkGame(game.TemplateId);
+        TellWordBox.Draw(game.TellWord, value => game.TellWord = value, () => app.Store.MarkGame(game.TemplateId));
         if (Chrome.Area("Host notes", game.HostNotes, value => game.HostNotes = value, 50))
             app.Store.MarkGame(game.TemplateId);
         GameForms.Rounds(app, game.Rounds, null, null, () => app.Store.MarkGame(game.TemplateId));
@@ -273,6 +274,7 @@ internal static class EventGamePanel
             app.Store.MarkEvent(ev.EventId);
         if (Chrome.Field("Participation", selected.ParticipationMethod, value => selected.ParticipationMethod = value))
             app.Store.MarkEvent(ev.EventId);
+        TellWordBox.Draw(selected.TellWord, value => selected.TellWord = value, () => app.Store.MarkEvent(ev.EventId));
         if (Chrome.Area("Host notes", selected.HostNotes, value => selected.HostNotes = value, 40))
             app.Store.MarkEvent(ev.EventId);
         if (selected.Formats.Contains(GameFormat.Tournament))
