@@ -5,7 +5,7 @@
     "Punchline": "Plan a party, then host it live.",
     "Description": "Plan a party, then host it live. Events, games, and scripts are JSON files, so a new party does not require a new build.",
     "InternalName": "EventHorizon",
-    "AssemblyVersion": "1.0.2.0",
+    "AssemblyVersion": "1.0.3.0",
     "RepoUrl": "https://github.com/NeonCelestialLanes/EventHorizon",
     "IconUrl": "https://raw.githubusercontent.com/NeonCelestialLanes/EventHorizon/main/images/icon.png",
     "ApplicableVersion": "any",
@@ -13,10 +13,10 @@
     "IsHide": false,
     "IsTestingExclusive": false,
     "DownloadCount": 0,
-    "LastUpdate": "1794572469",
-    "DownloadLinkInstall": "https://raw.githubusercontent.com/NeonCelestialLanes/EventHorizon/main/plugins/EventHorizon/EventHorizon-1.0.2.0.zip",
-    "DownloadLinkUpdate": "https://raw.githubusercontent.com/NeonCelestialLanes/EventHorizon/main/plugins/EventHorizon/EventHorizon-1.0.2.0.zip",
-    "DownloadLinkTesting": "https://raw.githubusercontent.com/NeonCelestialLanes/EventHorizon/main/plugins/EventHorizon/EventHorizon-1.0.2.0.zip",
+    "LastUpdate": "1794573082",
+    "DownloadLinkInstall": "https://raw.githubusercontent.com/NeonCelestialLanes/EventHorizon/main/plugins/EventHorizon/EventHorizon-1.0.3.0.zip",
+    "DownloadLinkUpdate": "https://raw.githubusercontent.com/NeonCelestialLanes/EventHorizon/main/plugins/EventHorizon/EventHorizon-1.0.3.0.zip",
+    "DownloadLinkTesting": "https://raw.githubusercontent.com/NeonCelestialLanes/EventHorizon/main/plugins/EventHorizon/EventHorizon-1.0.3.0.zip",
     "Tags": ["events", "roleplay", "hosting"],
     "AcceptsFeedback": false
   }

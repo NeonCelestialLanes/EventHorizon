@@ -1,6 +1,7 @@
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.ImGuiFileDialog;
+using Dalamud.Interface.Textures;
 using Dalamud.Interface.Windowing;
 using EventHorizon.Models;
 using EventHorizon.Persistence;
@@ -11,11 +12,13 @@ namespace EventHorizon.Ui;
 internal sealed partial class MainWindow : Window
 {
     private readonly HorizonApp app;
+    private readonly ISharedImmediateTexture? logo;
 
-    public MainWindow(HorizonApp app)
+    public MainWindow(HorizonApp app, ISharedImmediateTexture? logo)
         : base("Event Horizon")
     {
         this.app = app;
+        this.logo = logo;
         this.Size = new Vector2(1180, 760);
         this.SizeCondition = ImGuiCond.FirstUseEver;
         this.SizeConstraints = new WindowSizeConstraints
@@ -46,10 +49,7 @@ internal sealed partial class MainWindow : Window
         this.Nav("Scripts", "Scripts");
         this.Nav("Prizes & Winners", "Prizes");
         this.Nav("Notes", "Notes");
-        var settingsY = ImGui.GetCursorPosY();
-        var bottom = ImGui.GetContentRegionAvail().Y + settingsY - 46f;
-        if (bottom > settingsY)
-            ImGui.SetCursorPosY(bottom);
+        this.SidebarLogo();
         this.Nav("Settings", "Settings");
         ImGui.EndChild();
         ImGui.PopStyleVar(3);
@@ -124,6 +124,27 @@ internal sealed partial class MainWindow : Window
         }
 
         ImGui.Spacing();
+    }
+
+    private void SidebarLogo()
+    {
+        var wrap = this.logo?.GetWrapOrEmpty();
+        if (wrap is null || wrap.Handle == nint.Zero || wrap.Width <= 0 || wrap.Height <= 0)
+            return;
+
+        var width = Math.Max(1f, ImGui.GetContentRegionAvail().X);
+        var y = ImGui.GetCursorPosY();
+        var room = ImGui.GetContentRegionAvail().Y;
+        const float settingsH = 46f;
+        const float gap = 8f;
+        var size = Math.Min(width, Math.Max(0f, room - settingsH - gap));
+        if (size < 72f)
+            return;
+
+        ImGui.SetCursorPosY(y + room - settingsH - gap - size);
+        if (size < width)
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + ((width - size) * 0.5f));
+        ImGui.Image(wrap.Handle, new Vector2(size, size));
     }
 
     private void Nav(string label, string section)

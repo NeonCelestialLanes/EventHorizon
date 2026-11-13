@@ -22,6 +22,22 @@ internal static class ReleaseNotes
     [
         new ReleaseNote
         {
+            Version = "1.0.3",
+            Title = "The logo sits above Settings.",
+            Sections =
+            [
+                new ReleaseSection
+                {
+                    Heading = "New",
+                    Lines =
+                    [
+                        "The EH logo is in the sidebar, under Notes and above Settings. The background is transparent.",
+                    ],
+                },
+            ],
+        },
+        new ReleaseNote
+        {
             Version = "1.0.2",
             Title = "The EH logo is in the plugin list.",
             Sections =

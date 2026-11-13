@@ -1,4 +1,5 @@
 using Dalamud.Game.Command;
+using Dalamud.Interface.Textures;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
@@ -22,19 +23,20 @@ public sealed class Plugin : IDalamudPlugin
     private readonly LiveHostWindow host;
     private readonly CompactHostWindow compact;
 
-    public Plugin(IDalamudPluginInterface pluginInterface, ICommandManager commandManager, IChatGui chat, IPluginLog log)
+    public Plugin(IDalamudPluginInterface pluginInterface, ICommandManager commandManager, IChatGui chat, IPluginLog log, ITextureProvider textures)
     {
         this.pluginInterface = pluginInterface;
         this.commandManager = commandManager;
         this.chat = chat;
         this.log = log;
-        this.app = new HorizonApp(pluginInterface.GetPluginConfigDirectory(), new DalamudLog(log), pluginInterface.AssemblyLocation.DirectoryName);
+        var directory = pluginInterface.AssemblyLocation.DirectoryName;
+        this.app = new HorizonApp(pluginInterface.GetPluginConfigDirectory(), new DalamudLog(log), directory);
         this.app.Start();
         this.app.ScriptFace = new ScriptFace(pluginInterface);
         this.app.Travel = new VenueTeleport(pluginInterface);
         this.app.Sync = new PlannerSync(this.app.Store);
 
-        this.main = new MainWindow(this.app);
+        this.main = new MainWindow(this.app, LoadLogo(directory, textures));
         this.host = new LiveHostWindow(this.app);
         this.compact = new CompactHostWindow(this.app);
         this.windows.AddWindow(this.main);
@@ -91,6 +93,15 @@ public sealed class Plugin : IDalamudPlugin
         this.Apply(result.Request);
         if (!string.IsNullOrWhiteSpace(result.Message))
             this.chat.Print("[Event Horizon] " + result.Message);
+    }
+
+    private static ISharedImmediateTexture? LoadLogo(string? directory, ITextureProvider textures)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
+            return null;
+
+        var path = Path.Combine(directory, "images", "icon.png");
+        return File.Exists(path) ? textures.GetFromFile(path) : null;
     }
 
     private void OpenMain()

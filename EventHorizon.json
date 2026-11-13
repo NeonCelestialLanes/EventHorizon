@@ -6,7 +6,7 @@
   "InternalName": "EventHorizon",
   "RepoUrl": "https://github.com/NeonCelestialLanes/EventHorizon",
   "IconUrl": "https://raw.githubusercontent.com/NeonCelestialLanes/EventHorizon/main/images/icon.png",
-  "AssemblyVersion": "1.0.2.0",
+  "AssemblyVersion": "1.0.3.0",
   "ApplicableVersion": "any",
   "DalamudApiLevel": 15,
   "Tags": ["events", "roleplay", "hosting"],
