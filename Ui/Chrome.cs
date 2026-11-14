@@ -28,8 +28,9 @@ internal static class Chrome
         var size = ImGui.CalcTextSize(text) + (pad * 2f);
         var pos = ImGui.GetCursorScreenPos();
         var draw = ImGui.GetWindowDrawList();
-        draw.AddRectFilled(pos, pos + size, ImGui.GetColorU32(ThemeService.With(color, 0.18f)), 8f);
-        draw.AddRect(pos, pos + size, ImGui.GetColorU32(ThemeService.With(color, 0.9f)), 8f, ImDrawFlags.None, 1f);
+        var round = size.Y * 0.5f;
+        draw.AddRectFilled(pos, pos + size, ImGui.GetColorU32(ThemeService.With(color, 0.18f)), round);
+        draw.AddRect(pos, pos + size, ImGui.GetColorU32(ThemeService.With(color, 0.9f)), round, ImDrawFlags.None, 1f);
         draw.AddText(pos + pad, ImGui.GetColorU32(color), text);
         ImGui.Dummy(size);
     }
@@ -43,7 +44,7 @@ internal static class Chrome
 
         var textSize = ImGui.CalcTextSize(visible);
         var padX = Math.Max(28f, ImGui.GetStyle().FramePadding.X * 2f);
-        var padY = Math.Max(14f, ImGui.GetStyle().FramePadding.Y * 2f);
+        var padY = Math.Max(ThemeHolder.Compact ? 18f : 28f, ImGui.GetStyle().FramePadding.Y * 2f);
         if (size.Y < textSize.Y + padY)
             size.Y = textSize.Y + padY;
         if (size.X < 0f)
@@ -58,7 +59,7 @@ internal static class Chrome
         var over = hover ?? (fill is Vector4 custom ? Lighten(custom, 0.06f) : ThemeHolder.ButtonHover);
         var held = ImGui.IsItemActive();
         var face = held ? Darken(resting) : ImGui.IsItemHovered() ? over : resting;
-        DrawPill(min, max, face);
+        DrawPill(min, max, face, fill is null ? ThemeHolder.BorderStrong : null);
         var textPos = min + ((max - min - textSize) * 0.5f);
         if (held)
             textPos.Y += 1f;
@@ -79,83 +80,31 @@ internal static class Chrome
 
     public static bool Nav(string label, bool selected, string mark)
     {
+        _ = mark;
         var width = Math.Max(1f, ImGui.GetContentRegionAvail().X);
-        const float height = 40f;
+        const float height = 44f;
         var pressed = ImGui.InvisibleButton(label, new Vector2(width, height));
         var min = ImGui.GetItemRectMin();
         var max = ImGui.GetItemRectMax();
         var draw = ImGui.GetWindowDrawList();
-        Vector4 ink;
+        var ink = ThemeHolder.Muted;
         if (selected)
         {
-            draw.AddRectFilled(min, max, ImGui.GetColorU32(ThemeHolder.Accent), height * 0.5f);
-            ink = Contrast(ThemeHolder.Accent);
+            var left = ImGui.GetColorU32(ThemeService.With(ThemeHolder.Violet, 0.28f));
+            var right = ImGui.GetColorU32(ThemeService.With(ThemeHolder.Cyan, 0.10f));
+            draw.AddRectFilledMultiColor(min, max, left, right, right, left);
+            draw.AddRect(min, max, ImGui.GetColorU32(ThemeHolder.BorderStrong), 10f, ImDrawFlags.None, 1f);
+            ink = ThemeHolder.Text;
         }
         else if (ImGui.IsItemHovered())
         {
-            draw.AddRectFilled(min, max, ImGui.GetColorU32(ThemeHolder.ButtonHover), height * 0.5f);
+            draw.AddRectFilled(min, max, ImGui.GetColorU32(ThemeHolder.ButtonHover), 10f);
             ink = ThemeHolder.Text;
         }
-        else
-        {
-            ink = ThemeHolder.Muted;
-        }
 
-        const float markSize = 18f;
-        var markMin = min + new Vector2(10f, (height - markSize) * 0.5f);
-        var markMax = markMin + new Vector2(markSize, markSize);
-        var tile = selected ? new Vector4(0f, 0f, 0f, 0.18f) : ThemeHolder.Button;
-        draw.AddRectFilled(markMin, markMax, ImGui.GetColorU32(tile), 6f);
-        DrawMark(draw, mark, markMin, markMax, ink);
         var textSize = ImGui.CalcTextSize(label);
-        draw.AddText(new Vector2(markMax.X + 10f, min.Y + ((height - textSize.Y) * 0.5f)), ImGui.GetColorU32(ink), label);
+        draw.AddText(new Vector2(min.X + 12f, min.Y + ((height - textSize.Y) * 0.5f)), ImGui.GetColorU32(ink), label);
         return pressed;
-    }
-
-    private static void DrawMark(ImDrawListPtr draw, string mark, Vector2 min, Vector2 max, Vector4 ink)
-    {
-        var color = ImGui.GetColorU32(ink);
-        var center = (min + max) * 0.5f;
-        switch (mark)
-        {
-            case "Dashboard":
-                draw.AddRectFilled(center + new Vector2(-6f, -6f), center + new Vector2(-2f, -2f), color, 1f);
-                draw.AddRectFilled(center + new Vector2(2f, -6f), center + new Vector2(6f, -2f), color, 1f);
-                draw.AddRectFilled(center + new Vector2(-6f, 2f), center + new Vector2(-2f, 6f), color, 1f);
-                draw.AddRectFilled(center + new Vector2(2f, 2f), center + new Vector2(6f, 6f), color, 1f);
-                break;
-            case "Events":
-                draw.AddRect(center + new Vector2(-5.5f, -5f), center + new Vector2(5.5f, 6f), color, 2f, ImDrawFlags.None, 1.4f);
-                draw.AddLine(center + new Vector2(-5.5f, -1.5f), center + new Vector2(5.5f, -1.5f), color, 1.4f);
-                break;
-            case "Live":
-                draw.AddCircle(center, 6f, color, 16, 1.4f);
-                draw.AddCircleFilled(center, 2.6f, color);
-                break;
-            case "Games":
-                draw.AddTriangleFilled(center + new Vector2(0f, -6f), center + new Vector2(6f, 0f), center + new Vector2(0f, 6f), color);
-                draw.AddTriangleFilled(center + new Vector2(0f, -6f), center + new Vector2(-6f, 0f), center + new Vector2(0f, 6f), color);
-                break;
-            case "Scripts":
-                draw.AddLine(center + new Vector2(-5.5f, -4f), center + new Vector2(5.5f, -4f), color, 1.5f);
-                draw.AddLine(center + new Vector2(-5.5f, 0f), center + new Vector2(3f, 0f), color, 1.5f);
-                draw.AddLine(center + new Vector2(-5.5f, 4f), center + new Vector2(5.5f, 4f), color, 1.5f);
-                break;
-            case "Prizes":
-                draw.AddRectFilled(center + new Vector2(-5.5f, -4.5f), center + new Vector2(5.5f, -2f), color, 1f);
-                draw.AddRectFilled(center + new Vector2(-5f, -2f), center + new Vector2(5f, 5.5f), color, 1.5f);
-                draw.AddLine(center + new Vector2(0f, -4.5f), center + new Vector2(0f, 5.5f), ImGui.GetColorU32(new Vector4(0f, 0f, 0f, 0.35f)), 1.2f);
-                break;
-            case "Notes":
-                draw.AddRect(center + new Vector2(-5f, -6f), center + new Vector2(5f, 6f), color, 1.5f, ImDrawFlags.None, 1.4f);
-                draw.AddLine(center + new Vector2(-2.5f, -2f), center + new Vector2(2.5f, -2f), color, 1.2f);
-                draw.AddLine(center + new Vector2(-2.5f, 1.5f), center + new Vector2(2.5f, 1.5f), color, 1.2f);
-                break;
-            default:
-                draw.AddCircle(center, 5f, color, 12, 1.4f);
-                draw.AddCircleFilled(center, 1.6f, color);
-                break;
-        }
     }
 
     public static bool Field(string label, string? value, Action<string?> set, int max = 240)
@@ -249,16 +198,66 @@ internal static class Chrome
         return luminance > 0.62f ? new Vector4(0.08f, 0.07f, 0.12f, 1f) : new Vector4(0.97f, 0.97f, 0.99f, 1f);
     }
 
-    internal static void DrawPill(Vector2 min, Vector2 max, Vector4 face)
+    internal static void DrawPill(Vector2 min, Vector2 max, Vector4 face, Vector4? edge = null)
     {
         var draw = ImGui.GetWindowDrawList();
-        var radius = Math.Max(8f, (max.Y - min.Y) * 0.5f);
-        draw.AddRectFilled(
-            min + new Vector2(0f, 3f),
-            max + new Vector2(0f, 5f),
-            ImGui.GetColorU32(new Vector4(0f, 0f, 0f, 0.28f)),
-            radius);
+        var radius = Math.Min(12f, Math.Max(8f, (max.Y - min.Y) * 0.5f));
         draw.AddRectFilled(min, max, ImGui.GetColorU32(face), radius);
+        if (edge is Vector4 line)
+            draw.AddRect(min, max, ImGui.GetColorU32(line), radius, ImDrawFlags.None, 1f);
+    }
+
+    public static float ButtonHeight() => ImGui.GetTextLineHeight() + (ThemeHolder.Compact ? 18f : 28f);
+
+    public static float ButtonWidth(string label)
+    {
+        var visible = label;
+        var marker = visible.IndexOf("##", StringComparison.Ordinal);
+        if (marker >= 0)
+            visible = visible[..marker];
+        return ImGui.CalcTextSize(visible).X + Math.Max(28f, ImGui.GetStyle().FramePadding.X * 2f);
+    }
+
+    public static void Dashes(Vector2 min, Vector2 max, Vector4 color)
+    {
+        var draw = ImGui.GetWindowDrawList();
+        var ink = ImGui.GetColorU32(color);
+        const float dash = 6f;
+        const float gap = 4f;
+        for (var x = min.X; x < max.X; x += dash + gap)
+        {
+            var end = Math.Min(x + dash, max.X);
+            draw.AddLine(new Vector2(x, min.Y), new Vector2(end, min.Y), ink, 1f);
+            draw.AddLine(new Vector2(x, max.Y), new Vector2(end, max.Y), ink, 1f);
+        }
+
+        for (var y = min.Y; y < max.Y; y += dash + gap)
+        {
+            var end = Math.Min(y + dash, max.Y);
+            draw.AddLine(new Vector2(min.X, y), new Vector2(min.X, end), ink, 1f);
+            draw.AddLine(new Vector2(max.X, y), new Vector2(max.X, end), ink, 1f);
+        }
+    }
+
+    public static void Title(string text)
+    {
+        ImGui.SetWindowFontScale(1.2f);
+        ImGui.TextUnformatted(text);
+        ImGui.SetWindowFontScale(1f);
+    }
+
+    public static void CodeWell(string text, Vector4? ink = null)
+    {
+        var width = Math.Max(1f, ImGui.GetContentRegionAvail().X);
+        var height = ImGui.GetTextLineHeight() * 2.6f;
+        var min = ImGui.GetCursorScreenPos();
+        var max = min + new Vector2(width, height);
+        var draw = ImGui.GetWindowDrawList();
+        draw.AddRectFilled(min, max, ImGui.GetColorU32(ThemeHolder.BgAlt), 12f);
+        Dashes(min, max, ThemeHolder.BorderStrong);
+        var size = ImGui.CalcTextSize(text);
+        draw.AddText(min + new Vector2((width - size.X) * 0.5f, (height - size.Y) * 0.5f), ImGui.GetColorU32(ink ?? ThemeHolder.Cyan), text);
+        ImGui.Dummy(new Vector2(width, height));
     }
 
     private static Vector4 Lighten(Vector4 color, float amount) =>

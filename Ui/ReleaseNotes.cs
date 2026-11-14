@@ -22,6 +22,26 @@ internal static class ReleaseNotes
     [
         new ReleaseNote
         {
+            Version = "1.0.7",
+            Title = "The live desk matches the new layout.",
+            Sections =
+            [
+                new ReleaseSection
+                {
+                    Heading = "New",
+                    Lines =
+                    [
+                        "Live Host reads the full Discord script in Say this.",
+                        "Copy announcement returns to the first paragraph after the last one.",
+                        "Open a game sits under the stage directions, above Previous and Next.",
+                        "Settings has theme tiles, accent colors, and live sync.",
+                        "Tonight keeps the time clear of long titles.",
+                    ],
+                },
+            ],
+        },
+        new ReleaseNote
+        {
             Version = "1.0.6",
             Title = "Trivia and Two Truths host from the file.",
             Sections =

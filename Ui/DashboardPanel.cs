@@ -60,7 +60,7 @@ internal static class DashboardPanel
         var meta = EventClock.FormatDate(ev.Date) + "  ·  " + EventClock.FormatClock(ev.Date, ev.StartTime, ev.Timezone) + "  ·  " + Labels.Location(ev);
         var metaHeight = ImGui.CalcTextSize(meta, false, inner).Y;
         var lines = next is null ? 3 : 4;
-        var height = (style.WindowPadding.Y * 2f) + (line * lines) + metaHeight + 14f + button + 36f;
+        var height = (style.WindowPadding.Y * 2f) + (line * (lines + 1)) + metaHeight + 8f + button + 36f;
         var buttonRow = PillWidth(style, "Enter Live Host Mode") + PillWidth(style, "Teleport") + PillWidth(style, "Reset party") + (style.ItemSpacing.X * 2f);
         if (buttonRow > inner)
             height += button + style.ItemSpacing.Y;
@@ -71,7 +71,8 @@ internal static class DashboardPanel
         Chrome.Muted(EventClock.FormatDate(ev.Date) + "  ·  " + EventClock.FormatClock(ev.Date, ev.StartTime, ev.Timezone) + "  ·  " + Labels.Location(ev));
         var done = ScheduleOrder.SpokenCompleted(ev, state);
         var total = ScheduleOrder.Spoken(ev).Count;
-        ImGui.ProgressBar(total == 0 ? 0f : done / (float)total, new Vector2(-1, 14), done + " / " + total + " activities");
+        ImGui.TextUnformatted(done + " / " + total + " activities");
+        ImGui.ProgressBar(total == 0 ? 0f : done / (float)total, new Vector2(-1, 8), "");
         ImGui.TextDisabled("Now");
         ImGui.SameLine();
         ImGui.TextUnformatted(current?.Title ?? "Not started");

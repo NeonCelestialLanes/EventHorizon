@@ -5,8 +5,48 @@ using EventHorizon.Theme;
 
 namespace EventHorizon.Ui;
 
+internal readonly record struct SpeechFocus(string Title, string Spoken, int Number, int Count);
+
 internal static class LiveScriptView
 {
+    public static SpeechFocus Focus(EventDocument ev, LiveEventState state, ScheduleActivity? activity)
+    {
+        var head = activity is null ? null : ScriptSpeech.Head(ev, activity);
+        var scriptId = head?.ScriptId ?? activity?.ScriptId;
+        var title = head?.Title ?? activity?.Title ?? "This block";
+        if (string.IsNullOrWhiteSpace(scriptId))
+            return new SpeechFocus(title, "", 0, 0);
+
+        var paragraphs = ScriptSpeech.Paragraphs(ev.Scripts, scriptId);
+        if (paragraphs.Count == 0)
+            return new SpeechFocus(title, "", 0, 0);
+
+        var current = Math.Clamp(Cursor(state, scriptId).Index, 0, paragraphs.Count - 1);
+        return new SpeechFocus(title, paragraphs[current].Spoken, current + 1, paragraphs.Count);
+    }
+
+    public static string Spoken(EventDocument ev, ScheduleActivity? activity)
+    {
+        var head = activity is null ? null : ScriptSpeech.Head(ev, activity);
+        var scriptId = head?.ScriptId ?? activity?.ScriptId;
+        return ScriptSpeech.SpokenScript(ScriptSpeech.Paragraphs(ev.Scripts, scriptId));
+    }
+
+    public static void CopyAnnouncement(HorizonApp app, EventDocument ev, LiveEventState state, ScheduleActivity? activity)
+    {
+        var head = activity is null ? null : ScriptSpeech.Head(ev, activity);
+        var scriptId = head?.ScriptId ?? activity?.ScriptId;
+        if (string.IsNullOrWhiteSpace(scriptId))
+            return;
+
+        var paragraphs = ScriptSpeech.Paragraphs(ev.Scripts, scriptId);
+        if (paragraphs.Count == 0)
+            return;
+
+        var current = Math.Clamp(Cursor(state, scriptId).Index, 0, paragraphs.Count - 1);
+        Copy(app, ev, state, scriptId, paragraphs, current, advance: true, wrap: paragraphs.Count > 1);
+    }
+
     public static void Draw(HorizonApp app, EventDocument ev, LiveEventState state, ScheduleActivity? activity)
     {
         var head = activity is null ? null : ScriptSpeech.Head(ev, activity);
@@ -18,6 +58,8 @@ internal static class LiveScriptView
         var directions = ev.Scripts.FirstOrDefault(script => script.ScriptId == scriptId)?.StageDirections;
         if (!string.IsNullOrWhiteSpace(directions) && !directions.StartsWith("Read this continued", StringComparison.Ordinal))
             ImGui.TextColored(ThemeHolder.Gold, directions);
+
+        LiveHostPanel.GameMenu(app, ev, state);
 
         if (Chrome.Button("Previous activity"))
         {
@@ -44,13 +86,6 @@ internal static class LiveScriptView
         var cursor = Cursor(state, scriptId!);
         var current = Math.Clamp(cursor.Index, 0, paragraphs.Count - 1);
         ImGui.TextDisabled("Paragraph " + (current + 1) + " of " + paragraphs.Count + ". Copied is not the same as sent.");
-
-        var spoken = ScriptSpeech.SpokenScript(paragraphs);
-        Chrome.Section("Full Discord voice script");
-        var height = Math.Max(220f, ImGui.GetContentRegionAvail().Y * 0.34f);
-        if (ImGui.BeginChild("##eh-spoken", new System.Numerics.Vector2(-1, height), true))
-            ImGui.TextWrapped(spoken);
-        ImGui.EndChild();
 
         if (Chrome.Accent("Copy next"))
             Copy(app, ev, state, scriptId!, paragraphs, current, advance: true);
@@ -118,22 +153,27 @@ internal static class LiveScriptView
         }
     }
 
-    private static void Copy(HorizonApp app, EventDocument ev, LiveEventState state, string scriptId, List<SpeechParagraph> paragraphs, int index, bool advance, bool stick = false)
+    private static void Copy(HorizonApp app, EventDocument ev, LiveEventState state, string scriptId, List<SpeechParagraph> paragraphs, int index, bool advance, bool stick = false, bool wrap = false)
     {
         if (paragraphs.Count == 0)
             return;
 
         index = Math.Clamp(index, 0, paragraphs.Count - 1);
         var paragraph = paragraphs[index];
+        var last = index + 1 >= paragraphs.Count;
         ImGui.SetClipboardText(paragraph.Parts.Count == 1 ? paragraph.Parts[0] : string.Join("\n", paragraph.Parts));
         var cursor = Cursor(state, scriptId);
-        Remember(cursor, index, advance && index + 1 < paragraphs.Count);
+        Remember(cursor, index, advance && !last);
         if (stick)
             cursor.Index = index;
+        else if (wrap && last)
+            cursor.Index = 0;
         app.Store.MarkState(ev.EventId);
-        app.Note(index + 1 >= paragraphs.Count && advance
-            ? "Copied paragraph " + paragraphs.Count + ". That was the last one."
-            : "Copied paragraph " + (index + 1) + " of " + paragraphs.Count + ".");
+        app.Note(wrap && last
+            ? "Copied paragraph " + paragraphs.Count + ". Next copy is the first announcement."
+            : last && advance
+                ? "Copied paragraph " + paragraphs.Count + ". That was the last one."
+                : "Copied paragraph " + (index + 1) + " of " + paragraphs.Count + ".");
     }
 
     private static void Remember(SpeechCursor cursor, int index, bool advance)

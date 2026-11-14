@@ -984,50 +984,119 @@ internal static class LiveHostPanel
             return;
         }
 
-        if (poppedOut)
-            DueBanner.Draw(app);
         Banners.Draw(app, ev);
         var state = app.Store.StateFor(ev.EventId);
         var now = DateTimeOffset.Now;
         var current = ScheduleOrder.Current(ev, state);
-        var next = ScheduleOrder.NextAfterCurrent(ev, state);
-        ImGui.TextColored(ThemeHolder.Accent, ev.EventName);
-        ImGui.SameLine();
-        if (!poppedOut && Chrome.Button("Pop out"))
-            app.Session.RequestHost = true;
-        ImGui.SameLine();
-        if (Chrome.Button("Compact presenter"))
-            app.Session.RequestCompact = true;
-        if (!state.Hosting && Chrome.Accent("Start hosting"))
-            app.StartHosting(openWindow: !poppedOut);
-        ImGui.SameLine();
+        var scale = app.Store.Config.UiScale;
+        var rowRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+        ImGui.TextDisabled("NOW HOSTING");
+        ImGui.SetWindowFontScale(scale * 1.45f);
+        ImGui.TextUnformatted(ev.EventName);
+        ImGui.SetWindowFontScale(scale);
+        if (state.Hosting)
+        {
+            ImGui.SameLine();
+            Chrome.Badge("LIVE", ThemeHolder.Pink);
+        }
+
+        var group = Chrome.ButtonWidth("Teleport to venue") + Chrome.ButtonWidth("More") + (ImGui.GetStyle().ItemSpacing.X * 2f);
+        if (!state.Hosting)
+            group += Chrome.ButtonWidth("Start hosting") + ImGui.GetStyle().ItemSpacing.X;
+        var taken = ImGui.GetItemRectMax().X - ImGui.GetWindowPos().X + 12f;
+        ImGui.SameLine(Math.Max(taken, rowRight - group));
+        if (!state.Hosting)
+        {
+            if (Chrome.Accent("Start hosting"))
+                app.StartHosting(openWindow: !poppedOut);
+            ImGui.SameLine();
+        }
+
         EventActions.TeleportButton(app, ev, "live");
         ImGui.SameLine();
-        EventActions.ResetButton(app, ev);
+        if (Chrome.Button("More##live-more"))
+            ImGui.OpenPopup("eh-live-more");
+        if (ImGui.BeginPopup("eh-live-more"))
+        {
+            if (!poppedOut && Chrome.Button("Pop out", new Vector2(-1f, 0f)))
+            {
+                app.Session.RequestHost = true;
+                ImGui.CloseCurrentPopup();
+            }
 
-        var done = ScheduleOrder.SpokenCompleted(ev, state);
-        var slots = ScheduleOrder.Spoken(ev).Count;
-        ImGui.ProgressBar(slots == 0 ? 0f : done / (float)slots, new Vector2(-1, 16), done + " / " + slots);
+            if (Chrome.Button("Compact presenter", new Vector2(-1f, 0f)))
+            {
+                app.Session.RequestCompact = true;
+                ImGui.CloseCurrentPopup();
+            }
+
+            EventActions.ResetButton(app, ev);
+            ImGui.EndPopup();
+        }
+
+        ImGui.Spacing();
+        DueBanner.Draw(app);
+
         var suggested = ScheduleOrder.Suggested(ev, state, now);
         if (suggested is not null && suggested.ActivityId != state.CurrentActivityId)
             Chrome.Muted("Clock suggestion: " + suggested.Title + ". The schedule will not advance by itself.");
 
-        ImGui.BeginChild("now", new Vector2(ImGui.GetContentRegionAvail().X * 0.48f, 110), true);
-        ImGui.TextDisabled("Current activity");
-        ImGui.TextUnformatted(current?.Title ?? "Not started");
-        if (current is not null)
-            ImGui.TextDisabled(EventClock.FormatClock(ev.Date, current.StartTime, ev.Timezone) + " – " + EventClock.FormatClock(ev.Date, current.EndTime, ev.Timezone));
-        ImGui.EndChild();
+        var focus = LiveScriptView.Focus(ev, state, current);
+        var room = ImGui.GetContentRegionAvail();
+        var column = Math.Min(300f, Math.Max(180f, room.X * 0.32f));
+        var cardHeight = Math.Max(260f, room.Y * 0.55f);
+        ImGui.BeginChild("eh-say-card", new Vector2(Math.Max(80f, room.X - column - 12f), cardHeight), true);
+        var chip = current is null ? "Not started" : Persistence.Labels.Spaced(current.Category.ToString());
+        Chrome.Badge(chip, ThemeHolder.Violet);
         ImGui.SameLine();
-        ImGui.BeginChild("next", new Vector2(0, 110), true);
-        ImGui.TextDisabled("Next activity");
-        ImGui.TextUnformatted(next?.Title ?? "—");
-        if (next is not null)
+        ImGui.TextDisabled(focus.Count == 0 ? "No script yet" : "Paragraph " + focus.Number + " of " + focus.Count);
+        GradientBar(focus.Count == 0 ? 0f : focus.Number / (float)focus.Count);
+        ImGui.Spacing();
+        ImGui.TextDisabled("SAY THIS");
+        var answer = ReadAnswer(ev, state, current);
+        var footer = Chrome.ButtonHeight() + ImGui.GetStyle().ItemSpacing.Y + 12f;
+        if (answer is not null)
+            footer += Math.Max(52f, ImGui.GetTextLineHeight() * 2.6f) + ImGui.GetStyle().ItemSpacing.Y + 8f;
+        var scriptHeight = Math.Max(96f, ImGui.GetContentRegionAvail().Y - footer);
+        ImGui.BeginChild("eh-say-script", new Vector2(0f, scriptHeight), false);
+        var scriptScale = app.Store.Config.UiScale;
+        ImGui.SetWindowFontScale(1f);
+        var scriptFont = app.ScriptFace?.Push(scriptScale, app.Store.Config.ScriptFontScale) == true;
+        if (!scriptFont)
+            ImGui.SetWindowFontScale(scriptScale);
+        var spoken = LiveScriptView.Spoken(ev, current);
+        ImGui.TextWrapped(spoken.Length == 0 ? "This block has no script yet." : spoken);
+        if (scriptFont)
+            app.ScriptFace?.Pop();
+        ImGui.SetWindowFontScale(scriptScale);
+        ImGui.EndChild();
+        ImGui.Spacing();
+        AnswerWell(answer);
+        var tall = new Vector2(0f, Chrome.ButtonHeight() + 4f);
+        if (Chrome.Accent("Next activity", tall))
+            app.Advance();
+        ImGui.SameLine();
+        var copyLabel = focus.Count == 0 ? "Copy announcement" : "Copy announcement " + focus.Number + "/" + focus.Count;
+        if (Chrome.Button(copyLabel, tall))
+            LiveScriptView.CopyAnnouncement(app, ev, state, current);
+        if (answer is { } info)
         {
-            var start = EventClock.EffectiveStart(ev, next, state);
-            ImGui.TextDisabled(start is null ? EventClock.FormatClock(ev.Date, next.StartTime, ev.Timezone) : EventClock.Countdown(start.Value, now));
+            ImGui.SameLine();
+            if (Chrome.Button(info.Revealed ? "Hide answer" : "Reveal answer", tall))
+            {
+                var edit = HostController.EditGame(app.Store.StateFor(ev.EventId), info.Game.InstanceId);
+                if (info.Revealed)
+                    HostController.Hide(edit, info.RoundId);
+                else
+                    HostController.Reveal(edit, info.RoundId);
+                app.Store.MarkState(ev.EventId);
+            }
         }
 
+        ImGui.EndChild();
+        ImGui.SameLine();
+        ImGui.BeginChild("eh-tonight", new Vector2(0, cardHeight), true);
+        Tonight(ev, state, current);
         ImGui.EndChild();
 
         var stage = HostController.OnStage(ev, current, now);
@@ -1070,18 +1139,6 @@ internal static class LiveHostPanel
                 app.Note(dj.Name + " has no introduction text yet. Add it on the DJ tab.");
         }
 
-        if (ev.Games.Count > 0 && ImGui.BeginCombo("Open a game", "Choose"))
-        {
-            foreach (var game in ev.Games)
-            {
-                if (!ImGui.Selectable(game.Name))
-                    continue;
-                OpenGameWindow(app, ev, state, game.InstanceId);
-            }
-
-            ImGui.EndCombo();
-        }
-
         foreach (var contest in ev.Contests.Where(contest => contest.Clues.Count > 0))
             ContestClues(app, ev, state, contest);
 
@@ -1098,6 +1155,145 @@ internal static class LiveHostPanel
 
         foreach (var note in state.QuickNotes.AsEnumerable().Reverse().Take(4))
             ImGui.BulletText(note);
+    }
+
+    private static void GradientBar(float amount)
+    {
+        var width = Math.Max(1f, ImGui.GetContentRegionAvail().X);
+        const float height = 6f;
+        var min = ImGui.GetCursorScreenPos();
+        var max = min + new Vector2(width, height);
+        var draw = ImGui.GetWindowDrawList();
+        draw.AddRectFilled(min, max, ImGui.GetColorU32(ThemeHolder.Button), 99f);
+        var fill = Math.Clamp(amount, 0f, 1f) * width;
+        if (fill > 1f)
+        {
+            var end = min + new Vector2(fill, height);
+            var left = ImGui.GetColorU32(ThemeHolder.Violet);
+            var right = ImGui.GetColorU32(ThemeHolder.Cyan);
+            draw.AddRectFilledMultiColor(min, end, left, right, right, left);
+        }
+
+        ImGui.Dummy(new Vector2(width, height));
+    }
+
+    private readonly record struct AnswerInfo(GameInstance Game, string RoundId, string Answer, bool Revealed);
+
+    private static AnswerInfo? ReadAnswer(EventDocument ev, LiveEventState state, ScheduleActivity? current)
+    {
+        var game = OpenGame(ev, state, current);
+        if (game is null)
+            return null;
+
+        var progress = HostController.PeekGame(state, game.InstanceId);
+        var round = HostController.CurrentRound(game, progress);
+        if (round is null)
+            return null;
+
+        var answer = TriviaScore.IsTrivia(game)
+            ? TriviaScore.Current(game, progress)?.Answer ?? ""
+            : TwoTruths.Is(game)
+                ? TwoTruths.Answer(round)
+                : (round.CorrectAnswer ?? "").Trim();
+        if (answer.Length == 0)
+            return null;
+
+        return new AnswerInfo(game, round.RoundId, answer, HostController.IsRevealed(progress, round.RoundId));
+    }
+
+    private static void AnswerWell(AnswerInfo? answer)
+    {
+        if (answer is not { } info)
+            return;
+
+        var height = Math.Max(52f, ImGui.GetTextLineHeight() * 2.6f);
+        ImGui.PushStyleColor(ImGuiCol.ChildBg, ThemeHolder.BgAlt);
+        ImGui.PushStyleColor(ImGuiCol.Border, info.Revealed ? ThemeHolder.BorderStrong : new Vector4(0f, 0f, 0f, 0f));
+        ImGui.PushStyleVar(ImGuiStyleVar.ChildRounding, 12f);
+        ImGui.BeginChild("eh-answer", new Vector2(0f, height), true);
+        if (info.Revealed)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, ThemeHolder.Mint);
+            ImGui.TextWrapped(info.Answer);
+            ImGui.PopStyleColor();
+        }
+        else
+        {
+            ImGui.TextDisabled("Answer hidden");
+        }
+
+        ImGui.EndChild();
+        if (!info.Revealed)
+            Chrome.Dashes(ImGui.GetItemRectMin(), ImGui.GetItemRectMax(), ThemeHolder.BorderStrong);
+        ImGui.PopStyleVar();
+        ImGui.PopStyleColor(2);
+        ImGui.Spacing();
+    }
+
+    private static void Tonight(EventDocument ev, LiveEventState state, ScheduleActivity? current)
+    {
+        ImGui.TextUnformatted("Tonight");
+        var spoken = ScheduleOrder.Spoken(ev);
+        ImGui.BeginChild("eh-tonight-list", new Vector2(0, Math.Max(80f, ImGui.GetContentRegionAvail().Y - 72f)), false);
+        foreach (var activity in spoken)
+        {
+            var status = ScheduleOrder.StatusOf(activity, state);
+            var nowPlaying = current?.ActivityId == activity.ActivityId;
+            var done = status is ActivityProgressStatus.Completed or ActivityProgressStatus.Skipped;
+            var row = ImGui.GetCursorScreenPos();
+            var width = Math.Max(1f, ImGui.GetContentRegionAvail().X);
+            const float height = 36f;
+            if (nowPlaying)
+            {
+                var draw = ImGui.GetWindowDrawList();
+                draw.AddRectFilled(row, row + new Vector2(width, height), ImGui.GetColorU32(ThemeService.With(ThemeHolder.Violet, 0.18f)), 10f);
+                draw.AddRect(row, row + new Vector2(width, height), ImGui.GetColorU32(ThemeService.With(ThemeHolder.Violet, 0.6f)), 10f, ImDrawFlags.None, 1f);
+            }
+
+            var dot = ImGui.GetCursorScreenPos() + new Vector2(8f, 13f);
+            var list = ImGui.GetWindowDrawList();
+            if (done)
+                list.AddCircleFilled(dot + new Vector2(5f, 5f), 5f, ImGui.GetColorU32(ThemeHolder.Mint));
+            else if (nowPlaying)
+                list.AddCircleFilled(dot + new Vector2(5f, 5f), 5f, ImGui.GetColorU32(ThemeHolder.Cyan));
+            else
+                list.AddCircle(dot + new Vector2(5f, 5f), 4f, ImGui.GetColorU32(ThemeHolder.BorderStrong), 12, 2f);
+
+            ImGui.Dummy(new Vector2(width, height));
+            var mark = done ? "Done" : nowPlaying ? "Now" : EventClock.FormatClock(ev.Date, activity.StartTime, ev.Timezone);
+            var markSize = ImGui.CalcTextSize(mark);
+            const float titleX = 24f;
+            const float rightPad = 8f;
+            const float gap = 10f;
+            var titleMax = Math.Max(12f, width - titleX - markSize.X - rightPad - gap);
+            var ink = done ? ThemeHolder.Muted : ThemeHolder.Text;
+            ImGui.SetCursorScreenPos(row + new Vector2(titleX, 10f));
+            ImGui.PushClipRect(row + new Vector2(titleX, 0f), row + new Vector2(titleX + titleMax, height), true);
+            ImGui.TextColored(ink, Fit(activity.Title, titleMax));
+            ImGui.PopClipRect();
+            ImGui.SetCursorScreenPos(row + new Vector2(Math.Max(titleX, width - markSize.X - rightPad), 10f));
+            ImGui.TextColored(nowPlaying ? ThemeHolder.Cyan : ThemeHolder.Muted, mark);
+            ImGui.SetCursorScreenPos(row + new Vector2(0f, height));
+        }
+
+        ImGui.EndChild();
+        Chrome.Muted("The clock suggests what looks current. You decide when a block is done.");
+    }
+
+    private static string Fit(string text, float maxWidth)
+    {
+        if (text.Length == 0 || ImGui.CalcTextSize(text).X <= maxWidth)
+            return text;
+
+        const string ellipsis = "…";
+        var room = maxWidth - ImGui.CalcTextSize(ellipsis).X;
+        if (room <= 0f)
+            return ellipsis;
+
+        var count = text.Length;
+        while (count > 0 && ImGui.CalcTextSize(text[..count]).X > room)
+            count--;
+        return text[..count].TrimEnd() + ellipsis;
     }
 
     private static void ContestClues(HorizonApp app, EventDocument ev, LiveEventState state, ContestEntry contest)
@@ -1181,6 +1377,21 @@ internal static class LiveHostPanel
             return null;
 
         return ev.Games.FirstOrDefault(game => game.InstanceId == state.OpenGameInstanceId);
+    }
+
+    internal static void GameMenu(HorizonApp app, EventDocument ev, LiveEventState state)
+    {
+        if (ev.Games.Count == 0 || !ImGui.BeginCombo("Open a game", "Choose"))
+            return;
+
+        foreach (var game in ev.Games)
+        {
+            if (!ImGui.Selectable(game.Name + "##pick-" + game.InstanceId))
+                continue;
+            OpenGameWindow(app, ev, state, game.InstanceId);
+        }
+
+        ImGui.EndCombo();
     }
 
     private static void OpenGameWindow(HorizonApp app, EventDocument ev, LiveEventState state, string? instanceId)

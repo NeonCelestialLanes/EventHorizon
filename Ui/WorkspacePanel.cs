@@ -170,7 +170,7 @@ internal static class EventActions
 
     public static void TeleportButton(HorizonApp app, EventDocument ev, string scope)
     {
-        if (!Chrome.Button("Teleport##" + scope))
+        if (!Chrome.Button("Teleport to venue##" + scope))
             return;
 
         if (app.Travel is null)

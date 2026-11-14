@@ -19,7 +19,9 @@ internal readonly record struct Palette(
     Vector4 Border,
     Vector4 Button,
     Vector4 ButtonHover,
-    Vector4 Input)
+    Vector4 Input,
+    Vector4 Violet,
+    Vector4 BorderStrong)
 {
     public static Palette For(Persistence.HorizonConfig config)
     {
@@ -37,21 +39,23 @@ internal readonly record struct Palette(
     }
 
     public static Palette Midnight() => new(
-        Bg: Hex("10121C"),
-        BgAlt: Hex("191D2B"),
-        Panel: Hex("22283A"),
-        Text: Hex("F4F5FA"),
-        Muted: Hex("A7AEC3"),
-        Accent: Hex("A66CFF"),
-        Cyan: Hex("48DFF5"),
-        Pink: Hex("FF65B5"),
+        Bg: Hex("0B0D1A"),
+        BgAlt: Hex("0F1226"),
+        Panel: Hex("141831"),
+        Text: Hex("E8EAFF"),
+        Muted: Hex("9AA0C8"),
+        Accent: Hex("38E8FF"),
+        Cyan: Hex("38E8FF"),
+        Pink: Hex("FF4FD8"),
         Gold: Hex("FFC76A"),
-        Mint: Hex("65E3AE"),
+        Mint: Hex("3DFFA8"),
         Red: Hex("FF7086"),
-        Border: Hex("343B55", 0.9f),
-        Button: Hex("2A3148"),
-        ButtonHover: Hex("353D5C"),
-        Input: Hex("161A28"));
+        Border: Hex("262B4D"),
+        Button: Hex("1B2050"),
+        ButtonHover: Hex("262C66"),
+        Input: Hex("0F1226"),
+        Violet: Hex("8B5CF6"),
+        BorderStrong: Hex("3B3F78"));
 
     public static Palette Afterword() => new(
         Bg: Hex("0D141E"),
@@ -68,7 +72,9 @@ internal readonly record struct Palette(
         Border: Hex("3A4658", 0.85f),
         Button: Hex("243044"),
         ButtonHover: Hex("2E3D55"),
-        Input: Hex("121924"));
+        Input: Hex("121924"),
+        Violet: Hex("C6A56A"),
+        BorderStrong: Hex("3A4658"));
 
     public static Palette Arcade() => new(
         Bg: Hex("140818"),
@@ -85,7 +91,9 @@ internal readonly record struct Palette(
         Border: Hex("5A3480", 0.9f),
         Button: Hex("3A1C62"),
         ButtonHover: Hex("4C2780"),
-        Input: Hex("1A0C28"));
+        Input: Hex("1A0C28"),
+        Violet: Hex("FF4EBE"),
+        BorderStrong: Hex("5A3480"));
 
     public static Vector4 Hex(string hex, float alpha = 1f)
     {
@@ -121,8 +129,22 @@ internal static class ThemeHolder
 
     public static Vector4 ButtonHover { get; set; } = Palette.Midnight().ButtonHover;
 
+    public static Vector4 Violet { get; set; } = Palette.Midnight().Violet;
+
+    public static Vector4 Border { get; set; } = Palette.Midnight().Border;
+
+    public static Vector4 BorderStrong { get; set; } = Palette.Midnight().BorderStrong;
+
+    public static Vector4 Bg { get; set; } = Palette.Midnight().Bg;
+
+    public static Vector4 BgAlt { get; set; } = Palette.Midnight().BgAlt;
+
+    public static bool Compact { get; set; }
+
     public static void Apply(Palette palette)
     {
+        Bg = palette.Bg;
+        BgAlt = palette.BgAlt;
         Accent = palette.Accent;
         Muted = palette.Muted;
         Text = palette.Text;
@@ -134,6 +156,9 @@ internal static class ThemeHolder
         Panel = palette.Panel;
         Button = palette.Button;
         ButtonHover = palette.ButtonHover;
+        Violet = palette.Violet;
+        Border = palette.Border;
+        BorderStrong = palette.BorderStrong;
     }
 }
 
@@ -148,20 +173,21 @@ internal sealed class ThemeService
     {
         this.Current = Palette.For(config);
         ThemeHolder.Apply(this.Current);
+        ThemeHolder.Compact = config.CompactMode;
         var palette = this.Current;
         var compact = config.CompactMode;
         this.colors = 0;
         this.vars = 0;
 
         this.Var(ImGuiStyleVar.WindowRounding, 8f);
-        this.Var(ImGuiStyleVar.ChildRounding, 8f);
+        this.Var(ImGuiStyleVar.ChildRounding, 16f);
         this.Var(ImGuiStyleVar.FrameRounding, 6f);
         this.Var(ImGuiStyleVar.PopupRounding, 8f);
         this.Var(ImGuiStyleVar.GrabRounding, 6f);
         this.Var(ImGuiStyleVar.TabRounding, 6f);
         this.Var(ImGuiStyleVar.WindowBorderSize, 1f);
         this.Var(ImGuiStyleVar.ChildBorderSize, 1f);
-        this.Var(ImGuiStyleVar.FrameBorderSize, 0f);
+        this.Var(ImGuiStyleVar.FrameBorderSize, 1f);
         this.Var(ImGuiStyleVar.WindowPadding, compact ? new Vector2(12, 10) : new Vector2(16, 14));
         this.Var(ImGuiStyleVar.FramePadding, compact ? new Vector2(8, 4) : new Vector2(10, 6));
         this.Var(ImGuiStyleVar.ItemSpacing, compact ? new Vector2(8, 6) : new Vector2(10, 8));
@@ -171,7 +197,7 @@ internal sealed class ThemeService
         this.Col(ImGuiCol.Text, palette.Text);
         this.Col(ImGuiCol.TextDisabled, palette.Muted);
         this.Col(ImGuiCol.WindowBg, palette.Bg);
-        this.Col(ImGuiCol.ChildBg, palette.BgAlt);
+        this.Col(ImGuiCol.ChildBg, palette.Panel);
         this.Col(ImGuiCol.PopupBg, palette.Panel);
         this.Col(ImGuiCol.Border, palette.Border);
         this.Col(ImGuiCol.FrameBg, palette.Input);

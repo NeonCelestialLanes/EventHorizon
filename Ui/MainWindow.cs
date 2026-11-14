@@ -34,28 +34,33 @@ internal sealed partial class MainWindow : Window
     {
         ImGui.SetWindowFontScale(this.app.Store.Config.UiScale);
         this.ConsiderWhatsNew();
-        DueBanner.Draw(this.app);
-        this.Header();
         var sidebar = this.app.Store.Config.CompactMode ? 188f : 210f;
-        ImGui.PushStyleColor(ImGuiCol.ChildBg, ThemeHolder.Panel);
+        ImGui.PushStyleColor(ImGuiCol.ChildBg, ThemeHolder.BgAlt);
         ImGui.PushStyleVar(ImGuiStyleVar.ChildRounding, 16f);
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(8f, 10f));
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(8f, 6f));
         ImGui.BeginChild("eh-nav", new Vector2(sidebar, 0), false);
+        this.Brand();
         this.Nav("Dashboard", "Dashboard");
-        this.Nav("My Events", "Events");
+        this.Nav("Schedule", "Events");
         this.Nav("Live Host", "Live");
-        this.Nav("Game Library", "Games");
+        this.Nav("Games", "Games");
         this.Nav("Scripts", "Scripts");
-        this.Nav("Prizes & Winners", "Prizes");
+        this.Nav("Prizes", "Prizes");
         this.Nav("Notes", "Notes");
-        this.SidebarLogo();
         this.Nav("Settings", "Settings");
+        this.SyncChip();
         ImGui.EndChild();
         ImGui.PopStyleVar(3);
         ImGui.PopStyleColor();
         ImGui.SameLine();
+        ImGui.PushStyleColor(ImGuiCol.ChildBg, ThemeHolder.Bg);
         ImGui.BeginChild("eh-page", new Vector2(0, 0), false);
+        var section = this.app.Store.Config.Section;
+        if (section != "Live")
+            DueBanner.Draw(this.app);
+        if (section is not ("Live" or "Settings"))
+            this.PageHeader();
         switch (this.app.Store.Config.Section)
         {
             case "Events":
@@ -86,6 +91,7 @@ internal sealed partial class MainWindow : Window
 
         this.StatusLine();
         ImGui.EndChild();
+        ImGui.PopStyleColor();
         this.Popups();
         this.DrawWhatsNew();
         ImGui.SetWindowFontScale(1f);
@@ -107,6 +113,53 @@ internal sealed partial class MainWindow : Window
             if (ok && !string.IsNullOrWhiteSpace(path))
                 chosen(path);
         });
+    }
+
+    private void Brand()
+    {
+        var origin = ImGui.GetCursorScreenPos();
+        var draw = ImGui.GetWindowDrawList();
+        var center = origin + new Vector2(24f, 22f);
+        draw.AddCircle(center, 12f, ImGui.GetColorU32(ThemeHolder.Violet), 32, 2f);
+        draw.AddCircleFilled(center, 5f, ImGui.GetColorU32(ThemeHolder.BgAlt));
+        draw.AddCircle(center, 5f, ImGui.GetColorU32(ThemeHolder.Cyan), 24, 2f);
+        ImGui.SetCursorScreenPos(origin + new Vector2(44f, 22f - (ImGui.GetTextLineHeight() * 0.5f)));
+        ImGui.TextUnformatted("Event Horizon");
+        ImGui.SetCursorScreenPos(origin + new Vector2(0f, 52f));
+        ImGui.Dummy(new Vector2(1f, 1f));
+    }
+
+    private void PageHeader()
+    {
+        var selected = this.app.Store.SelectedEvent();
+        if (selected is null)
+            return;
+
+        ImGui.TextUnformatted(selected.EventName);
+        ImGui.SameLine();
+        Chrome.Badge(Labels.Spaced(selected.Status.ToString()), ThemeService.Status(this.app.Theme.Current, selected.Status));
+        ImGui.Spacing();
+    }
+
+    private void SyncChip()
+    {
+        var sharing = this.app.Sync is { Sharing: true };
+        var width = Math.Max(1f, ImGui.GetContentRegionAvail().X);
+        const float height = 36f;
+        var spare = ImGui.GetContentRegionAvail().Y - height - 8f;
+        if (spare > 0f)
+            ImGui.SetCursorPosY(ImGui.GetCursorPosY() + spare);
+        var min = ImGui.GetCursorScreenPos();
+        var max = min + new Vector2(width, height);
+        var draw = ImGui.GetWindowDrawList();
+        draw.AddRectFilled(min, max, ImGui.GetColorU32(ThemeHolder.Panel), 10f);
+        draw.AddRect(min, max, ImGui.GetColorU32(ThemeHolder.Border), 10f);
+        var dot = sharing ? ThemeHolder.Mint : ThemeHolder.Muted;
+        draw.AddCircleFilled(min + new Vector2(16f, height * 0.5f), 4f, ImGui.GetColorU32(dot));
+        var label = sharing ? "Synced with planners" : "Not sharing yet";
+        var text = ImGui.CalcTextSize(label);
+        draw.AddText(min + new Vector2(28f, (height - text.Y) * 0.5f), ImGui.GetColorU32(ThemeHolder.Muted), label);
+        ImGui.Dummy(new Vector2(width, height));
     }
 
     private void Header()
