@@ -98,6 +98,46 @@ Check("uno registration", () =>
     var cueRound = new GameRound { Choices = ["A: Red glamour.", "B: Named a minion.", "C: Three chairs."] };
     var cue = RoundCue.Paste([cueScript], cueRound);
     Require(cue == "All right, let's hear our three Chirps! A: Red glamour. B: Named a minion. C: Three chairs. So, which one?" && !cue.Contains("[ANSWER]") && !cue.Contains("[READ CHIRP"), cue);
+    var filed = new GameRound
+    {
+        Choices = ["A: Real one", "B: The fake one", "C: Real two"],
+        CorrectAnswer = "C",
+        Extras = new Dictionary<string, string> { ["fictionalChirp"] = "The fake one", ["fakePositionDraft"] = "B" },
+    };
+    Require(TwoTruths.Answer(filed) == "B", TwoTruths.Answer(filed));
+    var yelled = TwoTruths.RoundYell([cueScript], cueRound);
+    Require(yelled.Count > 0 && yelled[0].StartsWith("/yell ", StringComparison.Ordinal) && yelled[0].Contains("Red glamour."), yelled.Count == 0 ? "missing round yell" : yelled[0]);
+    Require(TwoTruths.IsRound([cueScript], cueRound, cue) && !TwoTruths.IsRound([cueScript], cueRound, "B"), "the yelled round starts the timer");
+    var answerScripts = new List<ScriptDocument>
+    {
+        cueScript,
+        new ScriptDocument { Announcement = "/yell And the fake Chirp was... [ANSWER]! Yes, the other two were actually real." },
+    };
+    var answerYell = TwoTruths.AnswerYell(answerScripts, filed);
+    Require(answerYell.Count > 4 && answerYell.All(line => line.StartsWith("/yell And the fake Chirp was... B!", StringComparison.Ordinal)) && answerYell.Count(line => line.EndsWith("B!", StringComparison.Ordinal)) >= 2 && answerYell.Any(line => line.Contains("A and C were real.")), "answer replies vary");
+    var answerCursor = 0;
+    var firstAnswer = TwoTruths.NextAnswer(filed, ref answerCursor);
+    var secondAnswer = TwoTruths.NextAnswer(filed, ref answerCursor);
+    Require(firstAnswer != secondAnswer && answerCursor == 2 && !firstAnswer.Contains("people's heads"), "each copy is a different reply");
+    Require(TwoTruths.IsAnswer(answerScripts, filed, firstAnswer) && TwoTruths.IsAnswer(answerScripts, filed, answerYell[0]) && !TwoTruths.IsAnswer(answerScripts, filed, "B"), "the answer yell is not a player answer");
+    var ranked = new GameProgress();
+    HostController.AddPlayer(ranked, "Nova");
+    HostController.AddPlayer(ranked, "Bea");
+    HostController.AddPlayer(ranked, "Rio");
+    ranked.Players[0].Score = 2;
+    ranked.Players[1].Score = 2;
+    ranked.Players[2].Score = 1;
+    var truthBoard = TwoTruths.Board(ranked);
+    Require(truthBoard.Count == 3 && truthBoard[0].Rank == 1 && truthBoard[1].Rank == 1 && truthBoard[2].Rank == 3 && truthBoard[2].Label == "Rio", "two truths leaderboard");
+    var truthTop = TwoTruths.TopThree(truthBoard, 4, 11);
+    Require(truthTop.Count > 0 && truthTop[0].StartsWith("/yell TWO TRUTHS LEADERBOARD!", StringComparison.Ordinal) && truthTop[0].Contains("Bea") && truthTop[0].Contains("Rio"), truthTop.Count == 0 ? "missing leaderboard" : truthTop[0]);
+    var truthNow = TwoTruths.Standings(truthBoard, 11);
+    Require(truthNow.Count == 1 && truthNow[0].Contains("tied for first") && truthNow[0].StartsWith("/yell ", StringComparison.Ordinal), truthNow.Count == 0 ? "missing standings" : truthNow[0]);
+    var truthScripts = new List<ScriptDocument> { new() { ScriptId = "scr-truths-cues-chat-7", Title = "Two Truths winner", Announcement = "/yell Congratulations to [WINNER]! You've just won yourself 1,250 Aether Coins!" } };
+    var truthWin = TwoTruths.WinnerYell(truthScripts, [new TruthRow(1, "Rio", 1)]);
+    Require(truthWin.Count == 1 && truthWin[0] == "/yell Congratulations to Rio! You've just won yourself 1,250 Aether Coins!", truthWin.Count == 0 ? "missing winner" : truthWin[0]);
+    var truthTie = TwoTruths.WinnerYell(truthScripts, truthBoard.Take(2).ToList());
+    Require(truthTie.Count == 1 && truthTie[0].Contains("tied") && !truthTie[0].Contains("[WINNER]"), truthTie.Count == 0 ? "missing tie" : truthTie[0]);
     var tags = new[] { "Velvet", "Lantern", "Harbor" };
     Require(CollectTell.SameWords(tags, "harbor VELVET lantern") && CollectTell.SameWords(tags, "velvet, lantern, harbor."), "collect tell");
     Require(!CollectTell.SameWords(tags, "velvet lantern") && !CollectTell.SameWords(tags, "velvet lantern harbor extra"), "incomplete collect tell");
@@ -243,6 +283,28 @@ Check("trivia scores", () =>
         Prizes = [new PrizeEntry { PrizeId = "prz-trivia", GameInstanceId = game.InstanceId, RewardType = RewardType.AetherCoins, Amount = 1250 }],
     };
     var state = new LiveEventState { EventId = ev.EventId };
+    var filedGame = new GameInstance
+    {
+        Rounds =
+        [
+            new GameRound { RoundId = "q1", Prompt = "One" },
+            new GameRound
+            {
+                RoundId = "tb",
+                Title = "Aetherphone Trivia — Tiebreaker (ONLY if tied)",
+                Prompt = "What tracks hunt marks?",
+                CorrectAnswer = "Hunts",
+                Extras = new Dictionary<string, string> { ["roundType"] = "TIEBREAKER", ["includeInRegularQuestionCount"] = "false" },
+            },
+        ],
+    };
+    var filed = TriviaScore.Questions(filedGame, null);
+    Require(filed.Count == 2 && !filed[0].Extra && filed[1].Extra && filed[1].Id == "tb" && filed[1].Answer == "Hunts", "the file's tiebreaker stays out of the regular count");
+    Require(TriviaScore.Progress(filedGame, new GameProgress()).Left == 1, "one regular question");
+    Require(TriviaScore.Heading(filedGame, new GameProgress()) == "Question 1 of 1", TriviaScore.Heading(filedGame, new GameProgress()));
+    var filedProgress = new GameProgress();
+    Require(TriviaScore.OpenTiebreak(filedGame, filedProgress), "open the filed tiebreaker");
+    Require(TriviaScore.Current(filedGame, filedProgress) is { Extra: true, Id: "tb" }, "tiebreaker is current");
     Require(TriviaScore.Finish(ev, game, progress, state) is not null, "tie needs a tiebreaker");
     TriviaScore.AddTiebreak(game, progress, "One more", "Yes");
     var extra = TriviaScore.Current(game, progress);
@@ -259,6 +321,13 @@ Check("trivia scores", () =>
     };
     var copied = TriviaScore.QuestionYell(asked, new GameProgress(), TriviaScore.Questions(asked, null)[0]);
     Require(copied.Count == 1 && copied[0] == "/yell Question 1: What color is the accent? Gold / Mint", copied[0]);
+    var pasted = "Question 1: What color is the accent? Gold / Mint";
+    Require(TriviaScore.IsQuestion(asked, new GameProgress(), TriviaScore.Questions(asked, null)[0], pasted), "a pasted question is recognized");
+    Require(TriviaScore.IsQuestion(asked, new GameProgress(), TriviaScore.Questions(asked, null)[0], "What color is the accent?"), "a yelled question is recognized");
+    Require(!TriviaScore.IsQuestion(asked, new GameProgress(), TriviaScore.Questions(asked, null)[0], "Gold"), "a short answer is not the question");
+    var fresh = new GameProgress();
+    Require(TriviaScore.Begin(fresh, "q", new DateTimeOffset(2026, 11, 14, 15, 0, 0, TimeSpan.Zero)), "pasting starts the timer");
+    Require(!TriviaScore.Begin(fresh, "q", new DateTimeOffset(2026, 11, 14, 15, 0, 10, TimeSpan.Zero)), "the second line does not restart it");
     Require(!copied[0].Contains("classified", StringComparison.Ordinal), "answer stays off the question");
     var longPrompt = new string('a', 40) + " marigold";
     var longGame = new GameInstance { Rounds = [new GameRound { RoundId = "long", Prompt = string.Join(". ", Enumerable.Repeat(longPrompt, 20)) }] };
@@ -303,14 +372,41 @@ Check("trivia scores", () =>
     Require(!TriviaScore.Arm(timed, "q1", start.AddSeconds(10), false), "timer keeps running");
     var running = TriviaScore.ReadClock(timed, "q1", start.AddSeconds(10));
     Require(running.Label == "0:50" && !running.Final && !running.Done, running.Label);
-    var ending = TriviaScore.ReadClock(timed, "q1", start.AddSeconds(55));
-    Require(ending.Final && ending.Label == "5", ending.Label);
+    var fiveLeft = TriviaScore.ReadClock(timed, "q1", start.AddSeconds(55));
+    Require(!fiveLeft.Final && fiveLeft.Label == "0:05", fiveLeft.Label);
+    var ending = TriviaScore.ReadClock(timed, "q1", start.AddSeconds(57));
+    Require(ending.Final && ending.Label == "3", ending.Label);
     var lastSecond = TriviaScore.ReadClock(timed, "q1", start.AddSeconds(59.1));
     Require(lastSecond.Final && lastSecond.Label == "1", lastSecond.Label);
     var finished = TriviaScore.ReadClock(timed, "q1", start.AddSeconds(60));
     Require(finished.Done && finished.Label == "Time", finished.Label);
+    var waiting = TriviaScore.ReadClock(new GameProgress(), "q0", start);
+    Require(waiting.Label == "1:00" && !waiting.Final && !waiting.Done, "timer waits until it is started");
     Require(TriviaScore.Arm(timed, "q2", start.AddMinutes(1), false), "next question");
     Require(TriviaScore.ReadClock(timed, "q2", start.AddMinutes(1)).Label == "1:00", "fresh minute");
+    Require(TriviaScore.CountdownYell(60) is null && TriviaScore.CountdownYell(9) is null && TriviaScore.CountdownYell(8) is null && TriviaScore.CountdownYell(3) is null && TriviaScore.CountdownYell(1) is null && TriviaScore.CountdownYell(0) is null, "quiet seconds stay quiet");
+    Require(TriviaScore.CountdownYell(15) == "/yell Last call!", "last call at 15");
+    Require(TriviaScore.CountdownYell(10) == "/yell 3!" && TriviaScore.CountdownYell(6) == "/yell 2!" && TriviaScore.CountdownYell(2) == "/yell 1!", "countdown is spaced out");
+    Require(TriviaScore.IsCountdown("3!") && TriviaScore.IsCountdown("Last call!") && !TriviaScore.IsCountdown("Chirper"), "countdown lines are not answers");
+    var lastCall = TriviaScore.DueYells(15, -1);
+    Require(lastCall.Lines.Count == 1 && lastCall.Lines[0] == "/yell Last call!" && lastCall.Announced == 15, "last call yells once");
+    Require(TriviaScore.DueYells(14, lastCall.Announced).Lines.Count == 0, "last call does not repeat");
+    var holding = TriviaScore.DueYells(11, -1);
+    Require(holding.Lines.Count == 0 && holding.Announced == -1, "eleven does not yell");
+    var three = TriviaScore.DueYells(10, holding.Announced);
+    Require(three.Lines.Count == 1 && three.Lines[0] == "/yell 3!" && three.Announced == 10, three.Lines.Count == 0 ? "missing three" : three.Lines[0]);
+    var stillThree = TriviaScore.DueYells(9, three.Announced);
+    Require(stillThree.Lines.Count == 0 && stillThree.Announced == 10, "three does not repeat");
+    var quiet = TriviaScore.DueYells(7, stillThree.Announced);
+    Require(quiet.Lines.Count == 0 && quiet.Announced == 10, "seven does not yell");
+    var two = TriviaScore.DueYells(6, quiet.Announced);
+    Require(two.Lines.Count == 1 && two.Lines[0] == "/yell 2!", "two");
+    var one = TriviaScore.DueYells(2, two.Announced);
+    Require(one.Lines.Count == 1 && one.Lines[0] == "/yell 1!" && one.Announced == 2, "one");
+    Require(TriviaScore.DueYells(1, one.Announced).Lines.Count == 0, "one does not repeat");
+    var jumped = TriviaScore.DueYells(10, -1);
+    Require(jumped.Lines.Count == 1 && jumped.Lines[0] == "/yell 3!" && jumped.Announced == 10, "opening during the countdown yells that second only");
+    Require(TriviaScore.DueYells(0, 2).Lines.Count == 0, "time stays on screen");
 });
 
 Check("due cue", () =>
@@ -579,6 +675,42 @@ Check("send winner", () =>
     Require(yell.StartsWith("/yell ", StringComparison.Ordinal) && yell.Contains("Bea (Mateus)") && yell.Contains("1,250 Aether Coins") && !yell.Contains("[WINNER]"), yell);
     progress.Players[1].Eliminated = true;
     Require(SendOrDelete.Yell(ev, game, progress).Length == 0, "nobody left standing");
+    var round = new GameRound
+    {
+        FeaturedStaff = "TBD - assign staff member and collect response",
+        Choices = ["SEND", "DELETE"],
+        Extras = new Dictionary<string, string> { ["chirp"] = "I have a separate Discord account." },
+    };
+    Require(SendOrDelete.ChirpYell(round) == "/yell I have a separate Discord account.", SendOrDelete.ChirpYell(round));
+    Require(SendOrDelete.QuestionYell == "/yell Would they send or delete this chirp?", "question");
+    Require(!SendOrDelete.ChirpYell(round).Contains("Would they", StringComparison.Ordinal), "the chirp stays separate from the question");
+    round.CorrectAnswer = "DELETE";
+    Require(SendOrDelete.ChoseYell(round) == "/yell They chose... DELETE!", SendOrDelete.ChoseYell(round));
+    round.FeaturedStaff = "Alliyah";
+    Require(SendOrDelete.ChoseYell(round) == "/yell Alliyah chose... DELETE!", SendOrDelete.ChoseYell(round));
+});
+
+Check("show djs", () =>
+{
+    var ev = new EventDocument
+    {
+        Date = "2026-11-14",
+        Timezone = "America/New_York",
+        Djs =
+        [
+            new DjSlot { DjId = "dj-a", Name = "Aura", StartTime = "11:00", EndTime = "13:00" },
+            new DjSlot { DjId = "dj-f", Name = "Frosty", StartTime = "13:00", EndTime = "15:00" },
+            new DjSlot { DjId = "dj-y", Name = "Yannick", StartTime = "15:00", EndTime = "18:00" },
+        ],
+    };
+    var morning = EventClock.Read(ev.Date, "07:00", ev.Timezone);
+    Require(morning.Ok, morning.Note ?? "morning");
+    var before = HostController.OnStage(ev, null, morning.Instant);
+    Require(before.Current is null && before.Upcoming?.Name == "Aura", "before the show");
+    var checkin = HostController.OnStage(ev, new ScheduleActivity { ActivityId = "act-checkin", StartTime = "12:00" }, morning.Instant);
+    Require(checkin.Current?.Name == "Aura" && checkin.Upcoming?.Name == "Frosty", "the activity moves the current DJ");
+    var handoff = HostController.OnStage(ev, new ScheduleActivity { ActivityId = "act-dj-frosty", StartTime = "13:00" }, morning.Instant);
+    Require(handoff.Current?.Name == "Frosty" && handoff.Upcoming?.Name == "Yannick", "the next set takes over");
 });
 
 var temp = Path.Combine(Path.GetTempPath(), "event-horizon-verify-" + Guid.NewGuid().ToString("N"));

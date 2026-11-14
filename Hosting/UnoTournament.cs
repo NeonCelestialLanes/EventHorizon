@@ -146,7 +146,7 @@ internal static class UnoTournament
     }
 
     public static string Announcement(string champion, string prize) =>
-        "/yell " + champion.Trim() + " wins the Uno tournament. The prize is " + prize.Trim() + ".";
+        "/yell And there we have it! " + champion.Trim() + " is our Uno champion! They ran the whole bracket! Congratulations! You've just won " + prize.Trim() + "! Everybody get on your feet and give our winner a huge round of applause!";
 
     public static void LinkChampion(EventDocument ev, GameInstance game, GameProgress progress, LiveEventState state)
     {

@@ -9,14 +9,11 @@ internal static class TriviaPanel
 {
     public static void Draw(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress)
     {
-        var questions = TriviaScore.Questions(game, progress.Trivia);
         var current = TriviaScore.Current(game, progress);
         var rows = TriviaScore.Board(progress);
         var counts = TriviaScore.Progress(game, progress);
         Chrome.Section("Trivia scoreboard");
-        ImGui.TextUnformatted(questions.Count == 0
-            ? "No questions yet."
-            : "Question " + ((progress.Trivia?.ViewIndex ?? 0) + 1) + " of " + questions.Count);
+        ImGui.TextUnformatted(TriviaScore.Heading(game, progress));
         ImGui.SameLine();
         ImGui.TextDisabled(counts.Done + " done  ·  " + counts.Left + " left");
         LeaderLine(rows);
@@ -137,15 +134,10 @@ internal static class TriviaPanel
             app.Note("Registration is closed.");
         }
 
-        var listening = progress.Trivia is { Listening: true };
-        if (Chrome.Button(listening ? "Stop listening" : "Listen for answers"))
-        {
-            Edit(app, ev, game, edit => TriviaScore.Desk(edit).Listening = !listening);
-            app.Note(listening ? "Trivia is no longer listening to chat." : "Say, yell, party, and alliance answers will be listed. Points stay with you.");
-        }
-
-        ImGui.SameLine();
-        Chrome.Muted(listening ? "Listening." : "Not listening.");
+        var ears = TriviaScore.Listening(app.Store);
+        Chrome.Muted(ears?.Game.InstanceId == game.InstanceId
+            ? "Listening for say, yell, party, and alliance. Points stay with you."
+            : "Trivia listens while this game is open and hosting is on.");
         var search = app.Session.TriviaSearch;
         if (Chrome.Field("Find a player", search, value => app.Session.TriviaSearch = value ?? ""))
             _ = search;
@@ -273,20 +265,29 @@ internal static class TriviaPanel
         if (leaders.Count > 1)
         {
             ImGui.TextColored(ThemeHolder.Gold, "Tiebreaker needed.");
-            var prompt = app.Session.TiePrompt;
-            if (Chrome.Field("Tiebreaker question", prompt, value => app.Session.TiePrompt = value ?? ""))
-                _ = prompt;
-            var answer = app.Session.TieAnswer;
-            if (Chrome.Field("Tiebreaker answer", answer, value => app.Session.TieAnswer = value ?? ""))
-                _ = answer;
-            if (Chrome.Accent("Add tiebreaker") && !string.IsNullOrWhiteSpace(app.Session.TiePrompt))
+            var filed = TriviaScore.Questions(game, progress.Trivia).FirstOrDefault(question => question.Extra);
+            if (!string.IsNullOrWhiteSpace(filed.Id))
             {
-                var text = app.Session.TiePrompt;
-                var hidden = app.Session.TieAnswer;
-                Edit(app, ev, game, edit => TriviaScore.AddTiebreak(game, edit, text, hidden));
-                app.Session.TiePrompt = "";
-                app.Session.TieAnswer = "";
-                app.Note("Tiebreaker added. Award one point when someone gets it.");
+                if (Chrome.Accent("Open tiebreaker"))
+                    Edit(app, ev, game, edit => TriviaScore.OpenTiebreak(game, edit));
+            }
+            else
+            {
+                var prompt = app.Session.TiePrompt;
+                if (Chrome.Field("Tiebreaker question", prompt, value => app.Session.TiePrompt = value ?? ""))
+                    _ = prompt;
+                var answer = app.Session.TieAnswer;
+                if (Chrome.Field("Tiebreaker answer", answer, value => app.Session.TieAnswer = value ?? ""))
+                    _ = answer;
+                if (Chrome.Accent("Add tiebreaker") && !string.IsNullOrWhiteSpace(app.Session.TiePrompt))
+                {
+                    var text = app.Session.TiePrompt;
+                    var hidden = app.Session.TieAnswer;
+                    Edit(app, ev, game, edit => TriviaScore.AddTiebreak(game, edit, text, hidden));
+                    app.Session.TiePrompt = "";
+                    app.Session.TieAnswer = "";
+                    app.Note("Tiebreaker added. Award one point when someone gets it.");
+                }
             }
         }
 
@@ -325,7 +326,7 @@ internal static class TriviaPanel
         ChatCopy.Button(app, key, lines, label, "There are no scores to copy yet.");
     }
 
-    public static void Clock(HorizonApp app, EventDocument ev, GameInstance game, string questionId, float fontScale)
+    public static void Clock(HorizonApp app, EventDocument ev, GameInstance game, string questionId, float fontScale, string pasted = "question")
     {
         var state = app.Store.StateFor(ev.EventId);
         var live = HostController.EditGame(state, game.InstanceId);
@@ -333,20 +334,57 @@ internal static class TriviaPanel
             return;
 
         var now = DateTimeOffset.Now;
-        if (TriviaScore.Arm(live, questionId, now, false))
-            app.Store.MarkState(ev.EventId);
+        var running = live.Trivia is { TimerQuestionId: var timed, TimerStarted: not null } && timed == questionId;
+        var key = running ? questionId + "\u001f" + live.Trivia!.TimerStarted!.Value.UtcTicks : null;
+        var owned = key is not null && app.Session.TriviaYells.ContainsKey(key);
+        if (owned)
+            YellCountdown(app, key!, live, questionId, now);
 
-        var clock = TriviaScore.ReadClock(live, questionId, now);
+        var clock = owned
+            ? TriviaScore.ReadClock(live, questionId, now)
+            : TriviaScore.ReadClock(new GameProgress(), questionId, now);
         var boost = clock.Final ? 2.8f : clock.Done ? 2.2f : 1.8f;
         ImGui.SetWindowFontScale(Math.Max(0.8f, fontScale) * boost);
         var color = clock.Final || clock.Done ? ThemeHolder.Pink : ThemeHolder.Gold;
         ImGui.TextColored(color, clock.Label);
         ImGui.SetWindowFontScale(fontScale);
-        ImGui.TextDisabled(clock.Final ? "Last five seconds" : clock.Done ? "Time is up" : "1:00 for this question");
-        if (Chrome.Button("Restart timer##" + questionId))
+        if (!owned)
+            ImGui.TextDisabled("The timer starts when this " + pasted + " is pasted in chat.");
+        else if (clock.Final)
+            ImGui.TextDisabled("Last three seconds");
+        else if (clock.Done)
+            ImGui.TextDisabled("Time is up");
+        ImGui.TextDisabled("Yells last call at 15 seconds, then 3 at 10, 2 at 6, and 1 at 2.");
+        if (app.Sync is { Sharing: true } && running && !owned)
+            ImGui.TextDisabled("Start the timer to yell the countdown from this computer.");
+        if (Chrome.Button((owned && !clock.Done ? "Restart timer##" : "Start timer##") + questionId))
         {
-            TriviaScore.Arm(live, questionId, DateTimeOffset.Now, true);
+            var restartedAt = DateTimeOffset.Now;
+            TriviaScore.Arm(live, questionId, restartedAt, true);
             app.Store.MarkState(ev.EventId);
+            var restartKey = questionId + "\u001f" + live.Trivia!.TimerStarted!.Value.UtcTicks;
+            app.Session.TriviaYellKey = restartKey;
+            app.Session.TriviaYells[restartKey] = -1;
+        }
+    }
+
+    private static void YellCountdown(HorizonApp app, string key, GameProgress live, string questionId, DateTimeOffset now)
+    {
+        var announced = app.Session.TriviaYells.TryGetValue(key, out var prior) ? prior : -1;
+        var due = TriviaScore.DueYells(TriviaScore.Remaining(live, questionId, now), announced);
+        app.Session.TriviaYells[key] = due.Announced;
+        if (due.Lines.Count == 0)
+            return;
+
+        try
+        {
+            foreach (var line in due.Lines)
+                CrowdYell.Send(line);
+        }
+        catch (Exception ex)
+        {
+            app.Log.Error(ex, "Could not yell the trivia countdown.");
+            app.Fail(ex.Message);
         }
     }
 

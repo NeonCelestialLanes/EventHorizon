@@ -15,6 +15,18 @@ internal static class GameBoard
         if (game.Rounds.Count > 0)
             progress.RoundIndex = Math.Clamp(progress.RoundIndex, 0, game.Rounds.Count - 1);
 
+        if (SendOrDelete.Is(game))
+        {
+            SendShow(app, ev, game, progress);
+            return;
+        }
+
+        if (TwoTruths.Is(game))
+        {
+            TruthShow(app, ev, game, progress);
+            return;
+        }
+
         ImGui.TextColored(ThemeHolder.Accent, game.Name);
         if (game.Formats.Count > 0)
             ImGui.TextDisabled(string.Join("  ·  ", game.Formats.Select(format => Persistence.Labels.Spaced(format.ToString()))));
@@ -75,8 +87,7 @@ internal static class GameBoard
         if (TriviaScore.IsTrivia(game))
         {
             var asked = TriviaScore.Current(game, progress);
-            var total = TriviaScore.Questions(game, progress.Trivia).Count;
-            ImGui.TextDisabled(total == 0 ? "No questions yet." : "Question " + ((progress.Trivia?.ViewIndex ?? 0) + 1) + " / " + total);
+            ImGui.TextDisabled(TriviaScore.Heading(game, progress));
             if (asked is { } question)
             {
                 TriviaPanel.Clock(app, ev, game, question.Id, Math.Max(1f, app.Store.Config.UiScale));
@@ -100,6 +111,18 @@ internal static class GameBoard
             return;
         }
 
+        if (SendOrDelete.Is(game))
+        {
+            SendCompact(app, ev, game, progress);
+            return;
+        }
+
+        if (TwoTruths.Is(game))
+        {
+            TruthCompact(app, ev, game, progress);
+            return;
+        }
+
         var round = HostController.CurrentRound(game, progress);
         ImGui.TextDisabled("Round " + (game.Rounds.Count == 0 ? 0 : Math.Clamp(progress.RoundIndex, 0, game.Rounds.Count - 1) + 1) + " / " + game.Rounds.Count);
         if (round is null)
@@ -120,11 +143,288 @@ internal static class GameBoard
         ImGui.SameLine();
         if (Chrome.Button("Next"))
             Mutate(app, ev, game, edit => HostController.NextRound(game, edit));
-        if (SendOrDelete.Is(game))
+    }
+
+    private static void SendShow(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress)
+    {
+        ImGui.TextColored(ThemeHolder.Accent, game.Name);
+        Chrome.Muted("Copy the chirp, then the question. Pick SEND or DELETE once the room has answered.");
+        Registration(app, ev, game, progress);
+        var round = HostController.CurrentRound(game, progress);
+        if (round is null)
+        {
+            Chrome.Muted("This game has no chirps yet.");
+        }
+        else
+        {
+            SendRound(app, ev, game, progress, round, compact: false);
+            if (Chrome.Button("Previous round"))
+                Mutate(app, ev, game, edit => HostController.PreviousRound(edit));
+            ImGui.SameLine();
+            if (Chrome.Button("Next round"))
+                Mutate(app, ev, game, edit => HostController.NextRound(game, edit));
+            ImGui.SameLine();
+            if (Chrome.Button("Announce the winner##send"))
+                AnnounceWinner(app, ev, game, progress);
+        }
+
+        Players(app, ev, game, progress);
+    }
+
+    private static void SendCompact(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress)
+    {
+        var round = HostController.CurrentRound(game, progress);
+        if (round is null)
+        {
+            Chrome.Muted("This game has no chirps yet.");
+            return;
+        }
+
+        SendRound(app, ev, game, progress, round, compact: true);
+        if (Chrome.Button("Next"))
+            Mutate(app, ev, game, edit => HostController.NextRound(game, edit));
+        ImGui.SameLine();
+        if (Chrome.Button("Announce the winner##send-compact"))
+            AnnounceWinner(app, ev, game, progress);
+    }
+
+    private static void SendRound(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress, GameRound round, bool compact)
+    {
+        var index = Math.Clamp(progress.RoundIndex, 0, Math.Max(0, game.Rounds.Count - 1));
+        ImGui.TextDisabled("Chirp " + (index + 1) + " / " + game.Rounds.Count);
+        var staff = round.FeaturedStaff;
+        if (Chrome.Field("Staff", staff, value => round.FeaturedStaff = value))
+            app.Store.MarkEvent(ev.EventId);
+
+        var chirp = SendOrDelete.Chirp(round);
+        if (chirp.Length == 0)
+            Chrome.Muted("This chirp is empty.");
+        else
+            ImGui.TextWrapped(chirp);
+
+        ChatCopy.Button(app, "send-chirp-" + round.RoundId, SendOrDelete.ChirpYell(round), "Copy chirp", "This chirp is empty.");
+        ImGui.SameLine();
+        ChatCopy.Button(app, "send-question-" + round.RoundId, SendOrDelete.QuestionYell, "Copy the question", "This question is empty.");
+
+        var answer = (round.CorrectAnswer ?? "").Trim();
+        var sent = answer.Equals("SEND", StringComparison.OrdinalIgnoreCase);
+        var deleted = answer.Equals("DELETE", StringComparison.OrdinalIgnoreCase);
+        if (sent ? Chrome.Accent("SEND##" + round.RoundId) : Chrome.Button("SEND##" + round.RoundId))
+            Choose(app, ev, game, round, "SEND");
+        ImGui.SameLine();
+        if (deleted ? Chrome.Accent("DELETE##" + round.RoundId) : Chrome.Button("DELETE##" + round.RoundId))
+            Choose(app, ev, game, round, "DELETE");
+        if (sent || deleted)
         {
             ImGui.SameLine();
-            if (Chrome.Button("Announce the winner"))
-                AnnounceWinner(app, ev, game, progress);
+            ChatCopy.Button(app, "send-chose-" + round.RoundId, SendOrDelete.ChoseYell(round), "Copy what they chose", "Pick SEND or DELETE first.");
+            if (!compact)
+                ImGui.TextColored(ThemeHolder.Mint, SendOrDelete.StaffName(round) is { Length: > 0 } name ? name + " chose " + answer + "." : "They chose " + answer + ".");
+        }
+    }
+
+    private static void Choose(HorizonApp app, EventDocument ev, GameInstance game, GameRound round, string answer)
+    {
+        round.CorrectAnswer = answer;
+        app.Store.MarkEvent(ev.EventId);
+        Mutate(app, ev, game, edit => HostController.Reveal(edit, round.RoundId));
+        var yell = SendOrDelete.ChoseYell(round);
+        if (yell.Length > 0)
+            ImGui.SetClipboardText(yell);
+        var who = SendOrDelete.StaffName(round);
+        app.Note((who.Length == 0 ? "They" : who) + " chose " + answer + ". The line is copied.");
+    }
+
+    private static void TruthShow(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress)
+    {
+        Chrome.Section("Two Truths");
+        var round = HostController.CurrentRound(game, progress);
+        var count = game.Rounds.Count;
+        var index = count == 0 ? 0 : Math.Clamp(progress.RoundIndex, 0, count - 1) + 1;
+        ImGui.TextUnformatted("Round " + index + " of " + count);
+        TruthLeader(progress);
+        if (round is null)
+            Chrome.Muted("This game has no rounds yet.");
+        else
+            TruthRound(app, ev, game, progress, round, compact: false);
+
+        var ears = TwoTruths.Listening(app.Store);
+        Chrome.Muted(ears?.Game.InstanceId == game.InstanceId
+            ? "Listening for say, yell, party, and alliance. Points stay with you."
+            : "Two Truths listens while this game is open and hosting is on.");
+        TruthHeard(app, ev, game, progress, round?.RoundId);
+        Registration(app, ev, game, progress);
+        Players(app, ev, game, progress);
+        TruthBoard(app, ev, game, progress);
+    }
+
+    private static void TruthCompact(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress)
+    {
+        var round = HostController.CurrentRound(game, progress);
+        var count = game.Rounds.Count;
+        var index = count == 0 ? 0 : Math.Clamp(progress.RoundIndex, 0, count - 1) + 1;
+        ImGui.TextDisabled("Round " + index + " of " + count);
+        if (round is null)
+        {
+            Chrome.Muted("This game has no rounds yet.");
+            return;
+        }
+
+        TruthRound(app, ev, game, progress, round, compact: true);
+        TruthLeader(progress);
+    }
+
+    private static void TruthRound(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress, GameRound round, bool compact)
+    {
+        if (!compact)
+            TriviaPanel.Clock(app, ev, game, round.RoundId, app.Store.Config.UiScale, "round");
+        else
+            TriviaPanel.Clock(app, ev, game, round.RoundId, Math.Max(1f, app.Store.Config.UiScale), "round");
+
+        var paragraph = RoundCue.Paste(ev.Scripts, round);
+        if (paragraph.Length == 0)
+            Chrome.Muted("This round has no chirps yet.");
+        else
+            ImGui.TextWrapped(paragraph);
+        ChatCopy.Button(app, "truth-round-" + round.RoundId, TwoTruths.RoundYell(ev.Scripts, round), "Copy round", "This round is empty.");
+
+        var answer = TwoTruths.Answer(round);
+        var revealed = HostController.IsRevealed(progress, round.RoundId);
+        if (answer.Length != 1)
+        {
+            if (!compact)
+                Chrome.Muted("This round has no answer in the file yet.");
+        }
+        else if (!revealed)
+        {
+            ImGui.TextColored(ThemeHolder.Gold, "Answer hidden. Only this window can reveal it.");
+            if (Chrome.Accent("Reveal answer"))
+                Mutate(app, ev, game, edit => HostController.Reveal(edit, round.RoundId));
+        }
+        else
+        {
+            ImGui.TextDisabled("The fake");
+            ImGui.SameLine();
+            ImGui.TextColored(ThemeHolder.Mint, answer);
+            if (Chrome.Button("Hide answer"))
+                Mutate(app, ev, game, edit => HostController.Hide(edit, round.RoundId));
+        }
+
+        if (answer.Length == 1)
+        {
+            ImGui.SameLine();
+            if (Chrome.Button("Copy answer##truth-answer-" + round.RoundId))
+            {
+                var cursor = app.Session.TruthAnswer;
+                var line = TwoTruths.NextAnswer(round, ref cursor);
+                app.Session.TruthAnswer = cursor;
+                if (line.Length == 0)
+                    app.Fail("This round has no answer in the file yet.");
+                else
+                {
+                    ImGui.SetClipboardText(line);
+                    app.Note("Copied.");
+                }
+            }
+        }
+
+        if (Chrome.Button(compact ? "Previous" : "Previous round"))
+            Mutate(app, ev, game, edit => HostController.PreviousRound(edit));
+        ImGui.SameLine();
+        if (Chrome.Button(compact ? "Next" : "Next round"))
+            Mutate(app, ev, game, edit => HostController.NextRound(game, edit));
+    }
+
+    private static void TruthHeard(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress, string? roundId)
+    {
+        Chrome.Section("Recent answers");
+        var all = app.Session.TriviaAllAnswers;
+        if (ImGui.Checkbox("Show every round", ref all))
+            app.Session.TriviaAllAnswers = all;
+        var heard = progress.Trivia?.Heard ?? [];
+        var shown = heard.Where(item => all || item.QuestionId == roundId).OrderBy(item => item.Order).ToList();
+        if (shown.Count == 0)
+        {
+            Chrome.Muted("No answers yet. The first line is the first one received.");
+            return;
+        }
+
+        ImGui.BeginChild("truth-heard", new Vector2(0, 140), true);
+        foreach (var item in shown)
+        {
+            ImGui.PushID(item.Order);
+            ImGui.TextDisabled(item.Order.ToString());
+            ImGui.SameLine();
+            ImGui.TextUnformatted(UnoTournament.Label(item.Name, item.World));
+            ImGui.SameLine();
+            if (Chrome.Button("Award"))
+            {
+                var person = item.Name;
+                var home = item.World;
+                Mutate(app, ev, game, edit =>
+                {
+                    var player = TriviaScore.Ensure(edit, person, home);
+                    player.Score += 1;
+                });
+            }
+
+            ImGui.TextWrapped(item.Message);
+            ImGui.PopID();
+        }
+
+        ImGui.EndChild();
+    }
+
+    private static void TruthLeader(GameProgress progress)
+    {
+        var leaders = TwoTruths.Board(progress).Where(row => row.Rank == 1 && row.Points > 0).ToList();
+        if (leaders.Count == 0)
+            ImGui.TextDisabled("No leader yet.");
+        else if (leaders.Count == 1)
+            ImGui.TextColored(ThemeHolder.Gold, "Leader: " + leaders[0].Label + " (" + leaders[0].Points + ")");
+        else
+            ImGui.TextColored(ThemeHolder.Gold, "Tied: " + string.Join(", ", leaders.Select(row => row.Label)) + " (" + leaders[0].Points + ")");
+    }
+
+    private static void TruthBoard(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress)
+    {
+        Chrome.Section("Leaderboard");
+        var rows = TwoTruths.Board(progress);
+        var total = game.Rounds.Count;
+        var done = total == 0 ? 0 : Math.Clamp(progress.RoundIndex, 0, total - 1) + 1;
+        var left = Math.Max(0, total - done);
+        Chrome.Muted("Copy the leaderboard to chat, then paste it in. Nothing is sent from here.");
+        ChatCopy.Button(app, "truth-top-" + game.InstanceId, TwoTruths.TopThree(rows, done, left), "Copy top 3", "There are no scores to copy yet.");
+        ImGui.SameLine();
+        ChatCopy.Button(app, "truth-all-" + game.InstanceId, TwoTruths.AllScores(rows), "Copy all scores", "There are no scores to copy yet.");
+        ImGui.SameLine();
+        ChatCopy.Button(app, "truth-now-" + game.InstanceId, TwoTruths.Standings(rows, left), "Copy current standings", "There are no scores to copy yet.");
+        ChatCopy.Button(app, "truth-final-" + game.InstanceId, TwoTruths.WinnerYell(ev.Scripts, rows), "Copy final results", "There are no scores to copy yet.");
+        if (rows.Count == 0)
+        {
+            Chrome.Muted("No players yet.");
+            return;
+        }
+
+        if (ImGui.BeginTable("truth-board", 3))
+        {
+            ImGui.TableSetupColumn("Rank");
+            ImGui.TableSetupColumn("Player");
+            ImGui.TableSetupColumn("Points");
+            ImGui.TableHeadersRow();
+            foreach (var row in rows)
+            {
+                ImGui.TableNextRow();
+                ImGui.TableNextColumn();
+                var color = row.Rank == 1 && row.Points > 0 ? ThemeHolder.Gold : ThemeHolder.Text;
+                ImGui.TextColored(color, row.Rank.ToString());
+                ImGui.TableNextColumn();
+                ImGui.TextColored(color, row.Label);
+                ImGui.TableNextColumn();
+                ImGui.TextColored(color, row.Points.ToString());
+            }
+
+            ImGui.EndTable();
         }
     }
 
@@ -229,10 +529,8 @@ internal static class GameBoard
                 Mutate(app, ev, game, edit => edit.Votes[key] = count + 1);
         }
 
-        if (round.Choices.Count > 0)
-            Chrome.Muted(KeepsScore(game)
-                ? "Choosing an option does not reveal the answer or change a score."
-                : "Click A, B, or C to copy that chirp. The answer stays hidden.");
+        if (round.Choices.Count > 0 && KeepsScore(game))
+            Chrome.Muted("Choosing an option does not reveal the answer or change a score.");
     }
 
     private static void Answer(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress, GameRound round)
@@ -315,11 +613,7 @@ internal static class GameBoard
         }
     }
 
-    private static bool TracksPoints(GameInstance game)
-    {
-        var name = game.Name ?? "";
-        return name.Contains("two truth", StringComparison.OrdinalIgnoreCase);
-    }
+    private static bool TracksPoints(GameInstance game) => TwoTruths.Is(game);
 
     private static void AnnounceWinner(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress)
     {
@@ -355,7 +649,8 @@ internal static class GameBoard
 
     private static void Players(HorizonApp app, EventDocument ev, GameInstance game, GameProgress progress)
     {
-        var scored = KeepsScore(game);
+        var pointsGame = TracksPoints(game);
+        var scored = KeepsScore(game) || pointsGame;
         Chrome.Section("Players");
         if (!scored)
             Chrome.Muted("Check Eliminated when they sit down. The last player still in is the winner.");
@@ -380,14 +675,9 @@ internal static class GameBoard
 
         if (!scored)
         {
-            var points = TracksPoints(game);
-            var standing = progress.Players.Where(player => !player.Eliminated && !string.IsNullOrWhiteSpace(player.Name)).Select(player => points ? player.Name.Trim() + " (" + player.Score + ")" : player.Name.Trim()).ToList();
+            var standing = progress.Players.Where(player => !player.Eliminated && !string.IsNullOrWhiteSpace(player.Name)).Select(player => player.Name.Trim()).ToList();
             if (progress.Winners.Count == 1)
-            {
-                var winner = progress.Winners[0];
-                var score = progress.Players.FirstOrDefault(player => player.Name.Trim() == winner)?.Score;
-                ImGui.TextColored(ThemeHolder.Gold, points && score is not null ? "Winner: " + winner + " (" + score + ")" : "Winner: " + winner);
-            }
+                ImGui.TextColored(ThemeHolder.Gold, "Winner: " + progress.Winners[0]);
             else if (standing.Count > 1)
                 ImGui.TextUnformatted("Still in: " + string.Join(", ", standing));
             else if (progress.Players.Any(player => !string.IsNullOrWhiteSpace(player.Name)))
@@ -419,43 +709,40 @@ internal static class GameBoard
             ImGui.SameLine();
             if (scored)
             {
-                ImGui.TextDisabled("Score");
+                ImGui.TextDisabled(pointsGame ? "Points" : "Score");
                 ImGui.SameLine();
                 var score = player.Score;
                 ImGui.SetNextItemWidth(80);
                 if (ImGui.InputInt("##score", ref score))
                     Mutate(app, ev, game, edit => edit.Players.First(item => item.PlayerId == player.PlayerId).Score = score);
-                ImGui.SameLine();
-                var eliminated = player.Eliminated;
-                if (ImGui.Checkbox("Out", ref eliminated))
-                    Mutate(app, ev, game, edit => edit.Players.First(item => item.PlayerId == player.PlayerId).Eliminated = eliminated);
-                ImGui.SameLine();
-                if (Chrome.Button("Winner"))
+                if (pointsGame)
                 {
-                    Mutate(app, ev, game, edit =>
+                    ImGui.SameLine();
+                    if (Chrome.Button("+1"))
                     {
-                        if (!edit.Winners.Contains(player.Name))
-                            edit.Winners.Add(player.Name);
-                    });
+                        var next = player.Score + 1;
+                        Mutate(app, ev, game, edit => edit.Players.First(item => item.PlayerId == player.PlayerId).Score = next);
+                    }
+                }
+                if (!pointsGame)
+                {
+                    ImGui.SameLine();
+                    var eliminated = player.Eliminated;
+                    if (ImGui.Checkbox("Out", ref eliminated))
+                        Mutate(app, ev, game, edit => edit.Players.First(item => item.PlayerId == player.PlayerId).Eliminated = eliminated);
+                    ImGui.SameLine();
+                    if (Chrome.Button("Winner"))
+                    {
+                        Mutate(app, ev, game, edit =>
+                        {
+                            if (!edit.Winners.Contains(player.Name))
+                                edit.Winners.Add(player.Name);
+                        });
+                    }
                 }
             }
             else
             {
-                if (TracksPoints(game))
-                {
-                    ImGui.TextDisabled("Points");
-                    ImGui.SameLine();
-                    var score = player.Score;
-                    ImGui.SetNextItemWidth(70);
-                    if (ImGui.InputInt("##points", ref score))
-                    {
-                        var written = score;
-                        Mutate(app, ev, game, edit => edit.Players.First(item => item.PlayerId == player.PlayerId).Score = written);
-                    }
-
-                    ImGui.SameLine();
-                }
-
                 var eliminated = player.Eliminated;
                 if (ImGui.Checkbox("Eliminated", ref eliminated))
                 {
@@ -743,8 +1030,9 @@ internal static class LiveHostPanel
 
         ImGui.EndChild();
 
-        var dj = HostController.DjForActivity(ev, current) ?? HostController.ScheduledDj(ev, now);
-        var upcoming = HostController.NextDj(ev, now);
+        var stage = HostController.OnStage(ev, current, now);
+        var dj = stage.Current;
+        var upcoming = stage.Upcoming;
         ImGui.TextDisabled("Current DJ");
         ImGui.SameLine();
         ImGui.TextUnformatted(dj?.Name ?? "—");
@@ -794,27 +1082,8 @@ internal static class LiveHostPanel
             ImGui.EndCombo();
         }
 
-        if (ev.Contests.SelectMany(contest => contest.Clues).Any())
-        {
-            Chrome.Section("Contest clues");
-            foreach (var contest in ev.Contests)
-            {
-                foreach (var clue in contest.Clues)
-                {
-                    var revealed = state.RevealedClueIds.Contains(clue.ClueId);
-                    ImGui.TextUnformatted(contest.Title + ": " + (revealed ? clue.Content : "Hidden"));
-                    ImGui.SameLine();
-                    if (Chrome.Button((revealed ? "Hide##" : "Reveal##") + clue.ClueId))
-                    {
-                        if (revealed)
-                            HostController.HideClue(state, clue.ClueId);
-                        else
-                            HostController.RevealClue(state, clue.ClueId);
-                        app.Store.MarkState(ev.EventId);
-                    }
-                }
-            }
-        }
+        foreach (var contest in ev.Contests.Where(contest => contest.Clues.Count > 0))
+            ContestClues(app, ev, state, contest);
 
         Chrome.Section("Quick note");
         if (Chrome.Required("##quick", app.Session.QuickNote, value => app.Session.QuickNote = value, 240))
@@ -829,6 +1098,78 @@ internal static class LiveHostPanel
 
         foreach (var note in state.QuickNotes.AsEnumerable().Reverse().Take(4))
             ImGui.BulletText(note);
+    }
+
+    private static void ContestClues(HorizonApp app, EventDocument ev, LiveEventState state, ContestEntry contest)
+    {
+        var collect = (contest.Title ?? "").Contains("collect", StringComparison.OrdinalIgnoreCase)
+            || (contest.ContestType ?? "").Contains("collect", StringComparison.OrdinalIgnoreCase);
+        Chrome.Section(string.IsNullOrWhiteSpace(contest.Title) ? "Contest" : contest.Title);
+        var winner = HostController.ContestWinner(state, contest);
+        if (!string.IsNullOrWhiteSpace(winner))
+            ImGui.TextColored(ThemeHolder.Gold, "Winner: " + winner.Trim());
+
+        var number = 0;
+        foreach (var clue in contest.Clues)
+        {
+            number++;
+            var word = (clue.Content ?? "").Trim();
+            var revealed = state.RevealedClueIds.Contains(clue.ClueId);
+            ImGui.PushID(clue.ClueId);
+            if (collect)
+            {
+                var when = string.IsNullOrWhiteSpace(clue.RevealTime)
+                    ? ""
+                    : "  ·  " + EventClock.FormatClock(ev.Date, clue.RevealTime, ev.Timezone);
+                ImGui.TextDisabled("Word " + number + " / " + contest.Clues.Count + when);
+                ImGui.TextColored(revealed ? ThemeHolder.Mint : ThemeHolder.Accent, word.Length == 0 ? "This word is empty." : word);
+                var line = TagLine(ev, word);
+                ChatCopy.Button(app, "tag-" + clue.ClueId, line, "Copy word " + number, "This word has no line to copy.");
+                ImGui.SameLine();
+                if (Chrome.Button(revealed ? "Read" : "Mark read"))
+                {
+                    if (revealed)
+                        HostController.HideClue(state, clue.ClueId);
+                    else
+                        HostController.RevealClue(state, clue.ClueId);
+                    app.Store.MarkState(ev.EventId);
+                }
+            }
+            else
+            {
+                ImGui.TextUnformatted(revealed ? word : "Hidden");
+                ImGui.SameLine();
+                if (Chrome.Button(revealed ? "Hide" : "Reveal"))
+                {
+                    if (revealed)
+                        HostController.HideClue(state, clue.ClueId);
+                    else
+                        HostController.RevealClue(state, clue.ClueId);
+                    app.Store.MarkState(ev.EventId);
+                }
+            }
+
+            ImGui.PopID();
+        }
+    }
+
+    private static string TagLine(EventDocument ev, string word)
+    {
+        if (word.Length == 0)
+            return "";
+
+        var slash = "/" + word + "/";
+        var script = ev.Scripts.FirstOrDefault(item =>
+            ((item.Announcement ?? "") + "\n" + (item.SpokenText ?? "")).Contains(slash, StringComparison.OrdinalIgnoreCase));
+        if (script is null)
+            return "";
+
+        var line = (script.Announcement ?? "").Trim();
+        if (line.Length > 0)
+            return line;
+
+        var spoken = (script.SpokenText ?? "").Replace('\n', ' ').Replace('\r', ' ').Trim();
+        return spoken.Length == 0 ? "" : "/yell " + spoken;
     }
 
     private static GameInstance? OpenGame(EventDocument ev, LiveEventState state, ScheduleActivity? current)

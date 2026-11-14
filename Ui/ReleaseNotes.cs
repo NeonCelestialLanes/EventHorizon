@@ -22,6 +22,29 @@ internal static class ReleaseNotes
     [
         new ReleaseNote
         {
+            Version = "1.0.6",
+            Title = "Trivia and Two Truths host from the file.",
+            Sections =
+            [
+                new ReleaseSection
+                {
+                    Heading = "New",
+                    Lines =
+                    [
+                        "Trivia listens for say, yell, party, and alliance. The timer starts when the question is yelled.",
+                        "The countdown yells last call at 15 seconds, then 3 at 10, 2 at 6, and 1 at 2.",
+                        "The tiebreaker is the extra question already in the file.",
+                        "Two Truths copies the round as a yell, and Copy answer changes the line each time.",
+                        "Two Truths has the same timer, listens for answers, and copies a leaderboard.",
+                        "Two Truths scores points. That roster no longer has Eliminated.",
+                        "The Uno winner yell names the champion and asks for a round of applause.",
+                        "Now playing follows the activity you are on.",
+                    ],
+                },
+            ],
+        },
+        new ReleaseNote
+        {
             Version = "1.0.5",
             Title = "Points, a winner yell, and live sync.",
             Sections =
@@ -31,7 +54,7 @@ internal static class ReleaseNotes
                     Heading = "New",
                     Lines =
                     [
-                        "Two Truths and a Chirp has points again. Eliminated still sits a player down.",
+                        "Two Truths and a Chirp scores points.",
                         "Send or Delete has Announce the winner. It yells the last player standing and the prize.",
                         "Live sync keeps registrations, eliminations, and points from both planners.",
                         "The edit boxes wrap long lines.",

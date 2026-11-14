@@ -79,8 +79,9 @@ internal static class DashboardPanel
         ImGui.TextDisabled("Next");
         ImGui.SameLine();
         ImGui.TextUnformatted(next is null ? "—" : next.Title);
-        var dj = HostController.DjForActivity(ev, current) ?? HostController.ScheduledDj(ev, now);
-        var upcoming = HostController.NextDj(ev, now);
+        var stage = HostController.OnStage(ev, current, now);
+        var dj = stage.Current;
+        var upcoming = stage.Upcoming;
         ImGui.TextDisabled("DJ");
         ImGui.SameLine();
         ImGui.TextUnformatted(dj?.Name ?? "—");

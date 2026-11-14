@@ -10,13 +10,15 @@ internal readonly record struct TriviaRow(int Rank, string PlayerId, string Labe
 
 internal readonly record struct TriviaClock(string Label, bool Final, bool Done);
 
+internal readonly record struct TriviaCalls(int Announced, IReadOnlyList<string> Lines);
+
 internal static class TriviaScore
 {
     public const int YellLimit = 500;
 
     public const int QuestionSeconds = 60;
 
-    public const int FinalCountdownSeconds = 5;
+    public const int FinalCountdownSeconds = 3;
 
     public static bool IsTrivia(GameInstance game)
     {
@@ -36,14 +38,45 @@ internal static class TriviaScore
     public static List<TriviaQuestion> Questions(GameInstance game, TriviaLive? desk)
     {
         var list = new List<TriviaQuestion>();
+        var breaks = new List<TriviaQuestion>();
         foreach (var round in game.Rounds)
-            list.Add(new TriviaQuestion(round.RoundId, round.Title ?? "", round.Prompt ?? "", round.CorrectAnswer, false));
+        {
+            var tie = IsTiebreak(round);
+            var item = new TriviaQuestion(round.RoundId, tie ? "Tiebreaker" : round.Title ?? "", round.Prompt ?? "", round.CorrectAnswer, tie);
+            if (tie)
+                breaks.Add(item);
+            else
+                list.Add(item);
+        }
+
+        list.AddRange(breaks);
         if (desk is null)
             return list;
 
         foreach (var extra in desk.Extras)
+        {
+            if (list.Any(item => item.Id == extra.QuestionId))
+                continue;
             list.Add(new TriviaQuestion(extra.QuestionId, "Tiebreaker", extra.Prompt, extra.Answer, true));
+        }
+
         return list;
+    }
+
+    public static string Heading(GameInstance game, GameProgress progress)
+    {
+        var questions = Questions(game, progress.Trivia);
+        if (questions.Count == 0)
+            return "No questions yet.";
+
+        var current = Current(game, progress);
+        if (current is { Extra: true })
+            return "Tiebreaker";
+
+        var regular = questions.Count(question => !question.Extra);
+        var index = questions.FindIndex(question => question.Id == current?.Id);
+        var number = index < 0 ? 1 : questions.Take(index + 1).Count(question => !question.Extra);
+        return "Question " + number + " of " + regular;
     }
 
     public static TriviaQuestion? Current(GameInstance game, GameProgress progress)
@@ -54,6 +87,46 @@ internal static class TriviaScore
 
         var index = Math.Clamp(progress.Trivia?.ViewIndex ?? progress.RoundIndex, 0, questions.Count - 1);
         return questions[index];
+    }
+
+    public static bool IsQuestion(GameInstance game, GameProgress progress, TriviaQuestion question, string message)
+    {
+        var heard = Flat(message);
+        if (heard.StartsWith("/yell ", StringComparison.OrdinalIgnoreCase))
+            heard = heard[6..].Trim();
+        if (heard.Length < 16)
+            return false;
+
+        var prompt = Flat(string.IsNullOrWhiteSpace(question.Prompt) ? question.Title ?? "" : question.Prompt);
+        if (prompt.Length >= 24)
+        {
+            var slice = prompt.Length <= 48 ? prompt : prompt[..48];
+            if (heard.Contains(slice, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        foreach (var piece in QuestionYell(game, progress, question))
+        {
+            var line = piece.StartsWith("/yell ", StringComparison.OrdinalIgnoreCase) ? piece[6..] : piece;
+            line = Flat(line);
+            if (line.Length == 0)
+                continue;
+            if (heard.Contains(line, StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (line.Contains(heard, StringComparison.OrdinalIgnoreCase) && heard.Length >= Math.Min(line.Length, 40))
+                return true;
+        }
+
+        return false;
+    }
+
+    public static bool Begin(GameProgress progress, string questionId, DateTimeOffset now)
+    {
+        var remaining = Remaining(progress, questionId, now);
+        if (remaining is > 0)
+            return false;
+
+        return Arm(progress, questionId, now, true);
     }
 
     public static bool Arm(GameProgress progress, string questionId, DateTimeOffset now, bool restart)
@@ -67,32 +140,128 @@ internal static class TriviaScore
         return true;
     }
 
-    public static TriviaClock ReadClock(GameProgress progress, string questionId, DateTimeOffset now)
+    public static int? Remaining(GameProgress progress, string questionId, DateTimeOffset now)
     {
         if (progress.Trivia is not { TimerQuestionId: var timed, TimerStarted: { } started } || timed != questionId)
-            return new TriviaClock(FormatClock(QuestionSeconds), false, false);
+            return null;
 
         var remaining = QuestionSeconds - (now - started).TotalSeconds;
         if (remaining <= 0)
+            return 0;
+
+        return (int)Math.Ceiling(remaining);
+    }
+
+    public static TriviaClock ReadClock(GameProgress progress, string questionId, DateTimeOffset now)
+    {
+        var seconds = Remaining(progress, questionId, now);
+        if (seconds is null)
+            return new TriviaClock(FormatClock(QuestionSeconds), false, false);
+
+        if (seconds <= 0)
             return new TriviaClock("Time", false, true);
 
-        var seconds = (int)Math.Ceiling(remaining);
         if (seconds <= FinalCountdownSeconds)
-            return new TriviaClock(seconds.ToString(), true, false);
+            return new TriviaClock(seconds.Value.ToString(), true, false);
 
-        return new TriviaClock(FormatClock(seconds), false, false);
+        return new TriviaClock(FormatClock(seconds.Value), false, false);
+    }
+
+    public static string? CountdownYell(int? seconds)
+    {
+        if (seconds == 15)
+            return "/yell Last call!";
+
+        var call = seconds switch
+        {
+            10 => "3",
+            6 => "2",
+            2 => "1",
+            _ => null,
+        };
+        return call is null ? null : "/yell " + call + "!";
+    }
+
+    public static bool IsCountdown(string message)
+    {
+        var heard = Flat(message);
+        if (heard.StartsWith("/yell ", StringComparison.OrdinalIgnoreCase))
+            heard = heard[6..].Trim();
+        return heard.Equals("Last call!", StringComparison.OrdinalIgnoreCase)
+            || heard is "3!" or "2!" or "1!";
+    }
+
+    public static TriviaCalls DueYells(int? seconds, int announced)
+    {
+        if (seconds is null || seconds == announced)
+            return new TriviaCalls(announced, []);
+
+        var line = CountdownYell(seconds);
+        if (line is null)
+            return new TriviaCalls(announced, []);
+
+        return new TriviaCalls(seconds.Value, [line]);
     }
 
     public static void Move(GameInstance game, GameProgress progress, int delta)
     {
         var desk = Desk(progress);
-        var count = Questions(game, desk).Count;
-        if (count == 0)
+        var questions = Questions(game, desk);
+        var regular = questions.Count(question => !question.Extra);
+        if (regular == 0)
             return;
 
-        desk.ViewIndex = Math.Clamp(desk.ViewIndex + delta, 0, count - 1);
-        if (desk.ViewIndex < game.Rounds.Count)
-            progress.RoundIndex = desk.ViewIndex;
+        var index = Math.Clamp(desk.ViewIndex, 0, questions.Count - 1);
+        if (index >= regular)
+        {
+            if (delta < 0)
+                Show(game, progress, regular - 1);
+            return;
+        }
+
+        Show(game, progress, Math.Clamp(index + delta, 0, regular - 1));
+    }
+
+    public static bool OpenTiebreak(GameInstance game, GameProgress progress)
+    {
+        var questions = Questions(game, Desk(progress));
+        var index = questions.FindIndex(question => question.Extra);
+        if (index < 0)
+            return false;
+
+        Show(game, progress, index);
+        return true;
+    }
+
+    private static void Show(GameInstance game, GameProgress progress, int index)
+    {
+        var desk = Desk(progress);
+        var questions = Questions(game, desk);
+        desk.ViewIndex = Math.Clamp(index, 0, Math.Max(0, questions.Count - 1));
+        if (desk.ViewIndex >= questions.Count)
+            return;
+
+        var roundIndex = game.Rounds.FindIndex(round => round.RoundId == questions[desk.ViewIndex].Id);
+        if (roundIndex >= 0)
+            progress.RoundIndex = roundIndex;
+    }
+
+    private static bool IsTiebreak(GameRound round)
+    {
+        if ((round.Title ?? "").Contains("tiebreak", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (round.Extras is null)
+            return false;
+
+        foreach (var pair in round.Extras)
+        {
+            if (pair.Key.Equals("roundType", StringComparison.OrdinalIgnoreCase) && (pair.Value ?? "").Contains("tiebreak", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (pair.Key.Equals("includeInRegularQuestionCount", StringComparison.OrdinalIgnoreCase) && string.Equals((pair.Value ?? "").Trim(), "false", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     public static PlayerRecord Ensure(GameProgress progress, string name, string? world)
@@ -157,9 +326,9 @@ internal static class TriviaScore
 
     public static (int Done, int Left) Progress(GameInstance game, GameProgress progress)
     {
-        var total = Questions(game, progress.Trivia).Count;
-        var done = progress.Trivia?.Results.Count(result => result.Skipped || !string.IsNullOrWhiteSpace(result.PlayerId)) ?? 0;
-        return (done, Math.Max(0, total - done));
+        var regular = Questions(game, progress.Trivia).Where(question => !question.Extra).Select(question => question.Id).ToHashSet(StringComparer.Ordinal);
+        var done = progress.Trivia?.Results.Count(result => regular.Contains(result.QuestionId) && (result.Skipped || !string.IsNullOrWhiteSpace(result.PlayerId))) ?? 0;
+        return (done, Math.Max(0, regular.Count - done));
     }
 
     public static string? Award(GameProgress progress, string questionId, string playerId)
@@ -320,7 +489,9 @@ internal static class TriviaScore
         if (leaders.Count == 0)
             return "Add players before ending trivia.";
         if (leaders.Count > 1)
-            return "It's a tie. Add a tiebreaker before crowning a winner.";
+            return Questions(game, progress.Trivia).Any(question => question.Extra)
+                ? "It's a tie. Open the tiebreaker before crowning a winner."
+                : "It's a tie. Add a tiebreaker before crowning a winner.";
 
         var desk = Desk(progress);
         desk.Ended = true;
@@ -515,31 +686,33 @@ internal static class TriviaScore
 
     public static (EventDocument Event, GameInstance Game, string? QuestionId)? Listening(HorizonStore store)
     {
-        var events = store.Events.Values.ToList();
-        var selected = store.SelectedEvent();
-        if (selected is not null)
+        var ev = store.SelectedEvent();
+        if (ev is null)
+            return null;
+
+        var state = store.StateFor(ev.EventId);
+        if (!state.Hosting)
+            return null;
+
+        GameInstance? game = null;
+        if (!string.IsNullOrWhiteSpace(state.OpenGameInstanceId))
         {
-            events.Remove(selected);
-            events.Insert(0, selected);
+            game = ev.Games.FirstOrDefault(item => item.InstanceId == state.OpenGameInstanceId);
+            if (game is null || !IsTrivia(game))
+                return null;
+        }
+        else
+        {
+            game = ev.Games.FirstOrDefault(IsTrivia);
+            if (game is null)
+                return null;
         }
 
-        foreach (var ev in events)
-        {
-            var state = store.StateFor(ev.EventId);
-            foreach (var game in ev.Games)
-            {
-                if (!IsTrivia(game))
-                    continue;
+        var progress = HostController.PeekGame(state, game.InstanceId);
+        if (progress.Trivia is { Ended: true })
+            return null;
 
-                var progress = HostController.PeekGame(state, game.InstanceId);
-                if (progress.Trivia is not { Listening: true })
-                    continue;
-
-                return (ev, game, Current(game, progress)?.Id);
-            }
-        }
-
-        return null;
+        return (ev, game, Current(game, progress)?.Id);
     }
 
     private static void Sync(GameProgress progress)
@@ -565,6 +738,27 @@ internal static class TriviaScore
 
     private static TriviaResult? Result(TriviaLive desk, string? questionId) =>
         string.IsNullOrWhiteSpace(questionId) ? null : desk.Results.FirstOrDefault(result => result.QuestionId == questionId);
+
+    private static string Flat(string raw)
+    {
+        var builder = new System.Text.StringBuilder();
+        var space = false;
+        foreach (var character in raw)
+        {
+            if (char.IsWhiteSpace(character))
+            {
+                space = builder.Length > 0;
+                continue;
+            }
+
+            if (space)
+                builder.Append(' ');
+            builder.Append(character);
+            space = false;
+        }
+
+        return builder.ToString();
+    }
 
     private static string Place(int rank)
     {

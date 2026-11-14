@@ -13,8 +13,9 @@ internal static class DjPanel
     {
         var now = DateTimeOffset.Now;
         var currentActivity = ScheduleOrder.Current(ev, app.Store.StateFor(ev.EventId));
-        var nowPlaying = HostController.DjForActivity(ev, currentActivity) ?? HostController.ScheduledDj(ev, now);
-        var upNext = HostController.NextDj(ev, now);
+        var stage = HostController.OnStage(ev, currentActivity, now);
+        var nowPlaying = stage.Current;
+        var upNext = stage.Upcoming;
         ImGui.TextDisabled("Now playing");
         ImGui.SameLine();
         ImGui.TextUnformatted(nowPlaying?.Name ?? "—");
@@ -22,7 +23,7 @@ internal static class DjPanel
         ImGui.TextDisabled("Up next");
         ImGui.SameLine();
         ImGui.TextUnformatted(upNext?.Name ?? "—");
-        Chrome.Muted("Now playing follows the current activity when it names a DJ. Otherwise it follows the clock. Links are never opened.");
+        Chrome.Muted("Now playing follows the activity you are on. Before the show starts, it follows the clock. Links are never opened.");
         if (Chrome.Button("Add DJ"))
         {
             ev.Djs.Add(new DjSlot

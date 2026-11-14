@@ -638,6 +638,19 @@ internal static class HostController
         return best;
     }
 
+    public static (DjSlot? Current, DjSlot? Upcoming) OnStage(EventDocument ev, ScheduleActivity? activity, DateTimeOffset now)
+    {
+        var moment = now;
+        if (activity is not null)
+        {
+            var start = EventClock.Read(ev.Date, activity.StartTime, ev.Timezone);
+            if (start.Ok)
+                moment = start.Instant;
+        }
+
+        return (DjForActivity(ev, activity) ?? ScheduledDj(ev, moment), NextDj(ev, moment));
+    }
+
     public static DjSlot? DjForActivity(EventDocument ev, ScheduleActivity? activity)
     {
         if (activity?.DjId is null)

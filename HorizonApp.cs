@@ -75,6 +75,12 @@ internal sealed class UiSession
 
     public bool TriviaAllAnswers { get; set; }
 
+    public int TruthAnswer { get; set; }
+
+    public string? TriviaYellKey { get; set; }
+
+    public Dictionary<string, int> TriviaYells { get; } = new(StringComparer.Ordinal);
+
     public string QuickNote { get; set; } = "";
 
     public string ExtraKey { get; set; } = "";

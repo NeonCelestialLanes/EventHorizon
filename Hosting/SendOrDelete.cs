@@ -6,6 +6,8 @@ namespace EventHorizon.Hosting;
 
 internal static class SendOrDelete
 {
+    public const string QuestionYell = "/yell Would they send or delete this chirp?";
+
     public static bool Is(GameInstance game)
     {
         var name = game.Name ?? "";
@@ -20,6 +22,45 @@ internal static class SendOrDelete
             return "";
 
         return "/yell And we've got our last player standing! Congratulations to " + winner + ", who wins " + Prize(ev, game) + "! Let's give our winner a round of applause!";
+    }
+
+    public static string Chirp(GameRound round)
+    {
+        if (round.Extras is null)
+            return "";
+
+        foreach (var pair in round.Extras)
+        {
+            if (pair.Key.Equals("chirp", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(pair.Value))
+                return pair.Value.Trim();
+        }
+
+        return "";
+    }
+
+    public static string ChirpYell(GameRound round)
+    {
+        var chirp = Chirp(round);
+        return chirp.Length == 0 ? "" : "/yell " + chirp;
+    }
+
+    public static string StaffName(GameRound round)
+    {
+        var name = (round.FeaturedStaff ?? "").Trim();
+        if (name.Length == 0 || name.Contains("TBD", StringComparison.OrdinalIgnoreCase) || name.Contains("assign", StringComparison.OrdinalIgnoreCase))
+            return "";
+
+        return name;
+    }
+
+    public static string ChoseYell(GameRound round)
+    {
+        var answer = (round.CorrectAnswer ?? "").Trim();
+        if (answer.Length == 0)
+            return "";
+
+        var staff = StaffName(round);
+        return "/yell " + (staff.Length == 0 ? "They" : staff) + " chose... " + answer + "!";
     }
 
     private static string Winner(GameProgress progress)
